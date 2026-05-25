@@ -1,0 +1,360 @@
+.tripwise-page {
+  max-width: 1280px;
+}
+
+.tripwise-header {
+  margin-bottom: 1rem;
+}
+
+.tripwise-title {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+}
+
+.tripwise-title h2 {
+  margin: 0;
+  color: #1e293b;
+  font-size: 2rem;
+}
+
+.tripwise-title p {
+  margin: 0.25rem 0 0;
+  color: #64748b;
+}
+
+.tripwise-summary {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(160px, 1fr));
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.tripwise-summary > div {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 1rem;
+}
+
+.tripwise-summary span {
+  display: block;
+  color: #64748b;
+  font-size: 0.78rem;
+  font-weight: 700;
+  margin-bottom: 0.35rem;
+  text-transform: uppercase;
+}
+
+.tripwise-summary strong {
+  color: #0f172a;
+  font-size: 1.35rem;
+}
+
+.tripwise-filters {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  display: grid;
+  grid-template-columns: minmax(260px, 1.5fr) repeat(5, minmax(150px, 1fr)) auto;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+  padding: 1rem;
+}
+
+.filter-field {
+  align-items: center;
+  background: #f8fafc;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  display: flex;
+  gap: 0.5rem;
+  min-width: 0;
+  padding: 0 0.75rem;
+}
+
+.filter-field svg {
+  color: #64748b;
+  flex: 0 0 auto;
+}
+
+.filter-field input,
+.filter-field select {
+  background: transparent;
+  border: 0;
+  color: #334155;
+  min-height: 44px;
+  min-width: 0;
+  outline: 0;
+  width: 100%;
+}
+
+.clear-filter-btn {
+  background: #0f172a;
+  border: 0;
+  border-radius: 8px;
+  color: #ffffff;
+  cursor: pointer;
+  font-weight: 700;
+  min-height: 44px;
+  padding: 0 1rem;
+}
+
+.trip-card-list {
+  display: grid;
+  gap: 0.85rem;
+}
+
+.trip-payment-card {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.trip-card-main {
+  align-items: stretch;
+  background: transparent;
+  border: 0;
+  color: inherit;
+  cursor: pointer;
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: minmax(260px, 1.2fr) minmax(360px, 1fr) auto;
+  padding: 1rem;
+  text-align: left;
+  width: 100%;
+}
+
+.trip-card-left {
+  min-width: 0;
+}
+
+.trip-card-left h3 {
+  color: #0f172a;
+  font-size: 1.35rem;
+  margin: 0.45rem 0 0.15rem;
+}
+
+.trip-card-left p {
+  color: #334155;
+  font-weight: 700;
+  margin: 0 0 0.35rem;
+}
+
+.trip-card-left small,
+.payment-line small {
+  color: #64748b;
+  display: block;
+  line-height: 1.45;
+  margin-top: 0.15rem;
+}
+
+.trip-money-grid {
+  display: grid;
+  gap: 0.65rem;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.trip-money-grid > div {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 0.8rem;
+}
+
+.trip-money-grid span,
+.payment-breakup span {
+  color: #64748b;
+  display: block;
+  font-size: 0.74rem;
+  font-weight: 800;
+  margin-bottom: 0.3rem;
+  text-transform: uppercase;
+}
+
+.trip-money-grid strong {
+  color: #0f172a;
+  font-size: 1.2rem;
+}
+
+.trip-money-grid .balance-due {
+  background: #fef2f2;
+  border-color: #fecaca;
+}
+
+.trip-money-grid .balance-due strong {
+  color: #dc2626;
+}
+
+.trip-money-grid .balance-clear {
+  background: #ecfdf5;
+  border-color: #bbf7d0;
+}
+
+.trip-money-grid .balance-clear strong {
+  color: #059669;
+}
+
+.trip-expand-icon {
+  align-items: center;
+  color: #2563eb;
+  display: flex;
+  flex-direction: column;
+  font-size: 0.76rem;
+  font-weight: 800;
+  gap: 0.2rem;
+  justify-content: center;
+  min-width: 68px;
+  text-transform: uppercase;
+}
+
+.trip-payment-details {
+  background: #f8fafc;
+  border-top: 1px solid #e2e8f0;
+  padding: 1rem;
+}
+
+.payment-breakup {
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin-bottom: 0.85rem;
+}
+
+.payment-breakup > div,
+.payment-line {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 0.8rem;
+}
+
+.payment-breakup strong {
+  color: #0f172a;
+}
+
+.payment-line-list {
+  display: grid;
+  gap: 0.65rem;
+}
+
+.payment-line {
+  align-items: flex-start;
+  display: flex;
+  gap: 1rem;
+  justify-content: space-between;
+}
+
+.payment-line > div:last-child {
+  min-width: 180px;
+  text-align: right;
+}
+
+.muted-line {
+  color: #64748b;
+  font-weight: 700;
+}
+
+.text-green {
+  color: #059669 !important;
+}
+
+.text-red {
+  color: #dc2626 !important;
+}
+
+.status-chip,
+.account-pill {
+  border-radius: 999px;
+  display: inline-flex;
+  font-size: 0.75rem;
+  font-weight: 700;
+  margin-top: 0.5rem;
+  padding: 0.25rem 0.55rem;
+}
+
+.status-chip.paid {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.status-chip.part-paid {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.status-chip.pending {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.account-pill {
+  background: #eff6ff;
+  color: #1d4ed8;
+  margin-right: 0.35rem;
+}
+
+.empty-row {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  color: #64748b !important;
+  padding: 2rem !important;
+  text-align: center;
+}
+
+@media (max-width: 1100px) {
+  .tripwise-summary,
+  .tripwise-filters {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .search-field,
+  .clear-filter-btn {
+    grid-column: span 2;
+  }
+
+  .trip-card-main {
+    grid-template-columns: 1fr;
+  }
+
+  .trip-expand-icon {
+    flex-direction: row;
+    justify-content: flex-start;
+  }
+}
+
+@media (max-width: 640px) {
+  .tripwise-title {
+    align-items: flex-start;
+  }
+
+  .tripwise-title h2 {
+    font-size: 1.45rem;
+  }
+
+  .tripwise-summary,
+  .tripwise-filters {
+    grid-template-columns: 1fr;
+  }
+
+  .search-field,
+  .clear-filter-btn {
+    grid-column: span 1;
+  }
+
+  .trip-money-grid,
+  .payment-breakup {
+    grid-template-columns: 1fr;
+  }
+
+  .payment-line {
+    flex-direction: column;
+  }
+
+  .payment-line > div:last-child {
+    min-width: 0;
+    text-align: left;
+  }
+}

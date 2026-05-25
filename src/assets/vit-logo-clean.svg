@@ -1,0 +1,32 @@
+<svg width="360" height="240" viewBox="0 0 360 240" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="vitBlue" x1="64" y1="40" x2="260" y2="204" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#31F2FF"/>
+      <stop offset="0.48" stop-color="#0787FF"/>
+      <stop offset="1" stop-color="#0049D8"/>
+    </linearGradient>
+    <linearGradient id="vitCyan" x1="180" y1="38" x2="310" y2="90" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#5DF8FF"/>
+      <stop offset="1" stop-color="#1BA3FF"/>
+    </linearGradient>
+    <linearGradient id="vitSilver" x1="152" y1="82" x2="182" y2="184" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFFFFF"/>
+      <stop offset="0.55" stop-color="#DCE6EF"/>
+      <stop offset="1" stop-color="#FFFFFF"/>
+    </linearGradient>
+    <filter id="vitShadow" x="35" y="18" width="300" height="198" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feDropShadow dx="0" dy="10" stdDeviation="9" flood-color="#001B44" flood-opacity="0.38"/>
+    </filter>
+  </defs>
+  <g filter="url(#vitShadow)">
+    <path d="M39 46H93L139 151L199 46H249L159 200H123L39 46Z" fill="url(#vitBlue)"/>
+    <path d="M65 59H87L132 161L141 145L101 59H123L151 119L163 97L140 46H156L180 46L138 121L128 139L65 59Z" fill="#7DF7FF" opacity="0.72"/>
+    <path d="M181 46H318L300 87H240L195 200H142L190 87H166L181 46Z" fill="url(#vitBlue)"/>
+    <path d="M198 57H301L295 72H237L191 185H167L215 72H188L198 57Z" fill="url(#vitCyan)" opacity="0.78"/>
+    <path d="M154 91H197L151 200L119 151L154 91Z" fill="url(#vitSilver)"/>
+    <path d="M49 46H93L139 151L199 46H249L159 200H123L39 46H49ZM60 57L130 186H152L230 57H205L139 173L86 57H60Z" fill="#EAFBFF" fill-opacity="0.58"/>
+    <path d="M181 46H318L300 87H240L195 200H142L190 87H166L181 46ZM190 57L185 72H212L164 185H185L230 72H291L298 57H190Z" fill="#EAFBFF" fill-opacity="0.62"/>
+  </g>
+  <path d="M129 217H231" stroke="#4AEFFF" stroke-width="2" stroke-linecap="round" opacity="0.55"/>
+  <ellipse cx="180" cy="217" rx="25" ry="5" fill="#42F3FF" opacity="0.5"/>
+</svg>
