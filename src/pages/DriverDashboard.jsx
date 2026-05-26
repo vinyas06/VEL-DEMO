@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { db } from "../firebase";
 import { collection, query, where, getDocs, addDoc, updateDoc, doc, or } from "firebase/firestore";
-import { Truck, MapPin, Navigation, PlusCircle, CheckCircle, LogOut, User, Clock, AlertTriangle, ArrowRightCircle, IndianRupee, FileText, X } from "lucide-react";
+import { Truck, MapPin, Navigation, PlusCircle, CheckCircle, LogOut, User, Clock, AlertTriangle, ArrowRightCircle, IndianRupee, X, WalletCards, Calendar } from "lucide-react";
 import "./DriverDashboard.css"; 
 
 const formatMoney = (value) =>
@@ -12,6 +12,42 @@ const getPayPlanLabel = (salaryType) => {
   if (salaryType === "commission") return "Commission Only";
   if (salaryType === "fixed_commission") return "Fixed + Commission";
   return "Fixed Salary";
+};
+
+const getDriverTransactionName = (record = {}) =>
+  record.driverName || record.payeeName || record.payee || "";
+
+const buildDriverWallet = (driverName, transactions = [], submissions = []) => {
+  const driverTransactions = transactions.filter(
+    (transaction) => getDriverTransactionName(transaction) === driverName
+  );
+  const givenByAdmin = driverTransactions
+    .filter((transaction) => transaction.category === "Driver Advance")
+    .reduce((sum, transaction) => sum + Number(transaction.amount || 0), 0);
+  const approvedSpent = driverTransactions
+    .filter(
+      (transaction) =>
+        transaction.category !== "Driver Advance" &&
+        transaction.category !== "Driver Salary" &&
+        transaction.deductionSource !== "driver_salary" &&
+        transaction.type !== "IN" &&
+        transaction.type !== "TRANSFER_IN"
+    )
+    .reduce((sum, transaction) => sum + Number(transaction.amount || 0), 0);
+  const pendingSpent = submissions
+    .filter(
+      (submission) =>
+        getDriverTransactionName(submission) === driverName &&
+        submission.deductionSource !== "driver_salary"
+    )
+    .reduce((sum, submission) => sum + Number(submission.amount || 0), 0);
+
+  return {
+    givenByAdmin,
+    approvedSpent,
+    pendingSpent,
+    available: givenByAdmin - approvedSpent - pendingSpent,
+  };
 };
 
 // Modified to load trips where the driver is EITHER driver 1 OR driver 2
@@ -28,7 +64,15 @@ const loadTripsForDriver = async (driverName) => {
 
 function DriverDashboard() {
   const [allTrips, setAllTrips] = useState([]);
+  const [driverTransactions, setDriverTransactions] = useState([]);
+  const [driverSubmissions, setDriverSubmissions] = useState([]);
   const [driverProfile, setDriverProfile] = useState(null); // 🔥 NEW: To store salary details
+  const [driverWallet, setDriverWallet] = useState({
+    givenByAdmin: 0,
+    approvedSpent: 0,
+    pendingSpent: 0,
+    available: 0,
+  });
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("current"); 
   const navigate = useNavigate();
@@ -39,10 +83,11 @@ function DriverDashboard() {
   const [showExpenseModal, setShowExpenseModal] = useState(false);
   const [showStatusModal, setShowStatusModal] = useState(false);
   const [showEarningsModal, setShowEarningsModal] = useState(false); // 🔥 NEW
+  const [earningsMonth, setEarningsMonth] = useState(new Date().toISOString().substring(0, 7));
   const [selectedTrip, setSelectedTrip] = useState(null);
   const [statusOdo, setStatusOdo] = useState("");
   
-  const [expenseForm, setExpenseForm] = useState({ type: "Fuel", amount: "", description: "" });
+  const [expenseForm, setExpenseForm] = useState({ type: "Fuel", amount: "", description: "", deductionSource: "admin_account" });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submittingStatus, setSubmittingStatus] = useState(null); 
 
@@ -61,8 +106,29 @@ function DriverDashboard() {
           setDriverProfile(driverSnap.docs[0].data());
         }
 
-        // 2. Fetch Trips
-        setAllTrips(await loadTripsForDriver(loggedInDriverName));
+        // 2. Fetch Trips and Driver Advance Account
+        const [trips, transactionSnap, submissionSnap] = await Promise.all([
+          loadTripsForDriver(loggedInDriverName),
+          getDocs(collection(db, "transactions")),
+          getDocs(collection(db, "driver_submissions")),
+        ]);
+        setAllTrips(trips);
+        const transactionData = transactionSnap.docs.map((docItem) => ({ id: docItem.id, ...docItem.data() }));
+        setDriverTransactions(
+          transactionData.filter((transaction) => getDriverTransactionName(transaction) === loggedInDriverName)
+        );
+        setDriverSubmissions(
+          submissionSnap.docs
+            .map((docItem) => ({ id: docItem.id, ...docItem.data() }))
+            .filter((submission) => getDriverTransactionName(submission) === loggedInDriverName)
+        );
+        setDriverWallet(
+          buildDriverWallet(
+            loggedInDriverName,
+            transactionData,
+            submissionSnap.docs.map((docItem) => ({ id: docItem.id, ...docItem.data() }))
+          )
+        );
       } catch (error) {
         console.error("Error fetching driver data:", error);
       } finally {
@@ -161,7 +227,7 @@ function DriverDashboard() {
     if (!expenseForm.amount) return alert("Please enter the amount.");
     setIsSubmitting(true);
     try {
-      await addDoc(collection(db, "driver_submissions"), {
+      const payload = {
         date: new Date().toISOString().split("T")[0],
         category: expenseForm.type,
         amount: Number(expenseForm.amount),
@@ -170,12 +236,22 @@ function DriverDashboard() {
         bookingId: selectedTrip.id,
         driverName: loggedInDriverName,
         notes: expenseForm.description,
+        deductionSource: expenseForm.deductionSource,
         createdAt: new Date().toISOString(),
         status: "Pending Approval"
-      });
+      };
+      const docRef = await addDoc(collection(db, "driver_submissions"), payload);
+      setDriverSubmissions((prev) => [...prev, { id: docRef.id, ...payload }]);
+      if (expenseForm.deductionSource !== "driver_salary") {
+        setDriverWallet((prev) => ({
+          ...prev,
+          pendingSpent: prev.pendingSpent + Number(expenseForm.amount),
+          available: prev.givenByAdmin - prev.approvedSpent - (prev.pendingSpent + Number(expenseForm.amount)),
+        }));
+      }
       alert("Expense submitted to Admin! ✅");
       setShowExpenseModal(false);
-      setExpenseForm({ type: "Fuel", amount: "", description: "" });
+      setExpenseForm({ type: "Fuel", amount: "", description: "", deductionSource: "admin_account" });
     } catch {
       alert("Error submitting expense.");
     } finally {
@@ -189,8 +265,26 @@ function DriverDashboard() {
   };
 
   // 🔥 EARNINGS CALCULATION LOGIC
-  const currentMonth = new Date().toISOString().substring(0, 7); // "YYYY-MM"
-  const currentMonthTrips = allTrips.filter(t => t.loadingDate && t.loadingDate.startsWith(currentMonth));
+  const currentMonthTrips = allTrips.filter(t => t.loadingDate && t.loadingDate.startsWith(earningsMonth));
+  const salaryDeductionList = driverTransactions.filter(
+    (transaction) =>
+      transaction.deductionSource === "driver_salary" &&
+      ((transaction.date || transaction.createdAt || "").startsWith(earningsMonth))
+  );
+  const pendingSalaryDeductionList = driverSubmissions.filter(
+    (submission) =>
+      submission.deductionSource === "driver_salary" &&
+      ((submission.date || submission.createdAt || "").startsWith(earningsMonth))
+  );
+  const approvedSalaryDeductions = salaryDeductionList.reduce(
+    (sum, transaction) => sum + Number(transaction.amount || 0),
+    0
+  );
+  const pendingSalaryDeductions = pendingSalaryDeductionList.reduce(
+    (sum, submission) => sum + Number(submission.amount || 0),
+    0
+  );
+  const salaryDeductions = approvedSalaryDeductions + pendingSalaryDeductions;
   
   const salaryType = driverProfile?.salaryType || "fixed";
   const monthlyBookingAmount = currentMonthTrips.reduce(
@@ -200,7 +294,8 @@ function DriverDashboard() {
   const fixedMonthlySalary = salaryType === "commission" ? 0 : Number(driverProfile?.salary) || 0;
   const commissionRate = salaryType === "fixed" ? 0 : Number(driverProfile?.commissionRate) || 0;
   const monthlyCommissionEarned = monthlyBookingAmount * (commissionRate / 100);
-  const totalMonthlyEarnings = fixedMonthlySalary + monthlyCommissionEarned;
+  const grossMonthlyEarnings = fixedMonthlySalary + monthlyCommissionEarned;
+  const totalMonthlyEarnings = grossMonthlyEarnings - salaryDeductions;
 
   const currentTrips = allTrips.filter(t => t.status !== "Booking Completed");
   const pastTrips = allTrips.filter(t => t.status === "Booking Completed");
@@ -216,32 +311,38 @@ function DriverDashboard() {
             <h3 className="driver-name">{loggedInDriverName}</h3>
           </div>
         </div>
-        <button className="logout-btn-pro" onClick={handleLogout}><LogOut size={22}/></button>
+        <div className="driver-nav-actions">
+          <button className="driver-commission-nav" onClick={() => setShowEarningsModal(true)}>
+            <span>Commission</span>
+            <strong>Rs {formatMoney(totalMonthlyEarnings)}</strong>
+          </button>
+          <button className="logout-btn-pro" onClick={handleLogout}><LogOut size={22}/></button>
+        </div>
       </div>
 
       {/* 🔥 NEW: EARNINGS WIDGET */}
       <section className="earnings-shell">
-        <button className="earnings-card-pro" onClick={() => setShowEarningsModal(true)}>
-          <div className="earnings-card-topline">
-            <span>{getPayPlanLabel(salaryType)}</span>
-            <FileText size={22} />
+        <button className="driver-wallet-card" onClick={() => navigate("/driver-expense")}>
+          <div className="driver-wallet-heading">
+            <span>Expense Advance</span>
+            <WalletCards size={22} />
           </div>
-          <div className="earnings-total">
+          <div className="driver-wallet-amount">
             <IndianRupee size={25} />
-            <strong>{formatMoney(totalMonthlyEarnings)}</strong>
+            <strong>{formatMoney(driverWallet.available)}</strong>
           </div>
-          <div className="earnings-mini-grid">
+          <div className="earnings-mini-grid driver-wallet-grid">
             <div>
-              <span>Base</span>
-              <strong>Rs {formatMoney(fixedMonthlySalary)}</strong>
+              <span>Given</span>
+              <strong>Rs {formatMoney(driverWallet.givenByAdmin)}</strong>
             </div>
             <div>
-              <span>Commission</span>
-              <strong>Rs {formatMoney(monthlyCommissionEarned)}</strong>
+              <span>Spent</span>
+              <strong>Rs {formatMoney(driverWallet.approvedSpent)}</strong>
             </div>
             <div>
-              <span>Trips</span>
-              <strong>{currentMonthTrips.length}</strong>
+              <span>Pending</span>
+              <strong>Rs {formatMoney(driverWallet.pendingSpent)}</strong>
             </div>
           </div>
         </button>
@@ -342,12 +443,17 @@ function DriverDashboard() {
             <div className="earnings-modal-header">
               <div>
                 <h3>Earnings Breakdown</h3>
-                <p>{new Date().toLocaleString("default", { month: "long", year: "numeric" })}</p>
+                <p>{earningsMonth}</p>
               </div>
               <button onClick={() => setShowEarningsModal(false)}><X size={24}/></button>
             </div>
 
             <div className="earnings-modal-body">
+              <label className="earnings-month-picker">
+                <span><Calendar size={14} /> Select Month</span>
+                <input type="month" value={earningsMonth} onChange={(event) => setEarningsMonth(event.target.value)} />
+              </label>
+
               <div className="pay-plan-strip">
                 <span>Pay Plan</span>
                 <strong>{getPayPlanLabel(salaryType)}</strong>
@@ -370,6 +476,48 @@ function DriverDashboard() {
                   <span>Commission Earned</span>
                   <strong>Rs {formatMoney(monthlyCommissionEarned)}</strong>
                 </div>
+                <div>
+                  <span>Deductions</span>
+                  <strong>Rs {formatMoney(salaryDeductions)}</strong>
+                </div>
+                <div>
+                  <span>Net Payable</span>
+                  <strong>Rs {formatMoney(totalMonthlyEarnings)}</strong>
+                </div>
+              </div>
+
+              <div className="earnings-trip-section">
+                <h4>Salary / Commission Deductions ({salaryDeductionList.length + pendingSalaryDeductionList.length})</h4>
+                {salaryDeductionList.length + pendingSalaryDeductionList.length === 0 ? (
+                  <p className="earnings-empty">No salary deductions for this month.</p>
+                ) : (
+                  <div className="earnings-trip-list">
+                    {salaryDeductionList.map((transaction) => (
+                      <div key={transaction.id} className="earnings-trip-row deduction-row">
+                        <div>
+                          <strong>{transaction.category || "Driver Expense Deduction"}</strong>
+                          <small>{transaction.date || "-"} | {transaction.notes || "Deducted from salary/commission"}</small>
+                        </div>
+                        <div>
+                          <span>Deducted</span>
+                          <strong>- Rs {formatMoney(transaction.amount)}</strong>
+                        </div>
+                      </div>
+                    ))}
+                    {pendingSalaryDeductionList.map((submission) => (
+                      <div key={submission.id} className="earnings-trip-row deduction-row">
+                        <div>
+                          <strong>{submission.category || "Driver Expense Deduction"}</strong>
+                          <small>{submission.date || "-"} | Pending approval{submission.notes ? `: ${submission.notes}` : ""}</small>
+                        </div>
+                        <div>
+                          <span>Pending</span>
+                          <strong>- Rs {formatMoney(submission.amount)}</strong>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
 
               <div className="earnings-trip-section">
@@ -399,7 +547,7 @@ function DriverDashboard() {
               </div>
 
               <div className="earnings-grand-total">
-                <span>Total Payable This Month</span>
+                <span>Net Payable This Month</span>
                 <strong>Rs {formatMoney(totalMonthlyEarnings)}</strong>
               </div>
             </div>
@@ -477,6 +625,14 @@ function DriverDashboard() {
               <div>
                 <label style={{ display: "block", marginBottom: "5px", fontWeight: "bold", color: "#334155" }}>Amount (₹)</label>
                 <input style={{ width: "100%", padding: "10px", borderRadius: "6px", border: "1px solid #cbd5e1", boxSizing: "border-box" }} type="number" placeholder="Enter amount" value={expenseForm.amount} onChange={(e) => setExpenseForm({...expenseForm, amount: e.target.value})} />
+              </div>
+
+              <div>
+                <label style={{ display: "block", marginBottom: "5px", fontWeight: "bold", color: "#334155" }}>Deduct From</label>
+                <select style={{ width: "100%", padding: "10px", borderRadius: "6px", border: "1px solid #cbd5e1" }} value={expenseForm.deductionSource} onChange={(e) => setExpenseForm({...expenseForm, deductionSource: e.target.value})}>
+                  <option value="admin_account">Use My Advance / Company Account</option>
+                  <option value="driver_salary">Deduct From My Commission</option>
+                </select>
               </div>
 
               <div>

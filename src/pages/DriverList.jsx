@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Navbar from "../components/Navbar";
 import Modal from "../components/Modal";
 import { db } from "../firebase";
@@ -20,8 +20,20 @@ const getSalaryTypeLabel = (driver = {}) => {
   return `Fixed Salary: Rs ${Number(driver.salary || 0).toLocaleString("en-IN")} / month`;
 };
 
+const toNumber = (value) => {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : 0;
+};
+
+const getDriverName = (record = {}) => record.driverName || record.payeeName || record.payee || "";
+
+const getRecordMonth = (record = {}) => String(record.loadingDate || record.date || record.createdAt || "").slice(0, 7);
+
 function DriverList() {
   const [drivers, setDrivers] = useState([]);
+  const [bookings, setBookings] = useState([]);
+  const [transactions, setTransactions] = useState([]);
+  const [submissions, setSubmissions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   
@@ -33,11 +45,19 @@ function DriverList() {
   useEffect(() => {
     const fetchDrivers = async () => {
       try {
-        const snap = await getDocs(collection(db, "drivers"));
-        const data = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        const [driverSnap, bookingSnap, transactionSnap, submissionSnap] = await Promise.all([
+          getDocs(collection(db, "drivers")),
+          getDocs(collection(db, "bookings")),
+          getDocs(collection(db, "transactions")),
+          getDocs(collection(db, "driver_submissions")),
+        ]);
+        const data = driverSnap.docs.map(d => ({ id: d.id, ...d.data() }));
         // Sort by name
         data.sort((a, b) => (a.name || "").localeCompare(b.name || ""));
         setDrivers(data);
+        setBookings(bookingSnap.docs.map((docItem) => ({ id: docItem.id, ...docItem.data() })));
+        setTransactions(transactionSnap.docs.map((docItem) => ({ id: docItem.id, ...docItem.data() })));
+        setSubmissions(submissionSnap.docs.map((docItem) => ({ id: docItem.id, ...docItem.data() })));
       } catch (error) {
         console.error("Error fetching drivers:", error);
       } finally {
@@ -81,6 +101,55 @@ function DriverList() {
     d.name?.toLowerCase().includes(searchTerm.toLowerCase()) || 
     d.phone?.includes(searchTerm)
   );
+
+  const selectedCommissionSummary = useMemo(() => {
+    if (!selected?.name) {
+      return null;
+    }
+
+    const driverTrips = bookings.filter(
+      (booking) => booking.driver === selected.name || booking.driver2 === selected.name
+    );
+    const commissionRate =
+      selected.salaryType === "fixed" ? 0 : toNumber(selected.commissionRate);
+    const bookingAmount = driverTrips.reduce(
+      (sum, booking) => sum + toNumber(booking.freight),
+      0
+    );
+    const commissionEarned = bookingAmount * (commissionRate / 100);
+    const approvedDeductions = transactions
+      .filter(
+        (transaction) =>
+          getDriverName(transaction) === selected.name &&
+          transaction.deductionSource === "driver_salary"
+      )
+      .reduce((sum, transaction) => sum + toNumber(transaction.amount), 0);
+    const pendingDeductions = submissions
+      .filter(
+        (submission) =>
+          getDriverName(submission) === selected.name &&
+          submission.deductionSource === "driver_salary"
+      )
+      .reduce((sum, submission) => sum + toNumber(submission.amount), 0);
+    const currentMonth = new Date().toISOString().slice(0, 7);
+    const currentMonthTrips = driverTrips.filter((booking) => getRecordMonth(booking) === currentMonth);
+    const currentMonthBookingAmount = currentMonthTrips.reduce(
+      (sum, booking) => sum + toNumber(booking.freight),
+      0
+    );
+
+    return {
+      tripCount: driverTrips.length,
+      bookingAmount,
+      commissionRate,
+      commissionEarned,
+      approvedDeductions,
+      pendingDeductions,
+      netCommission: commissionEarned - approvedDeductions - pendingDeductions,
+      currentMonthTripCount: currentMonthTrips.length,
+      currentMonthCommission: currentMonthBookingAmount * (commissionRate / 100),
+    };
+  }, [bookings, selected, submissions, transactions]);
 
   return (
     <div className="list-page-bg">
@@ -260,6 +329,22 @@ function DriverList() {
                     </p>
                   </div>
 
+                  {selectedCommissionSummary && (
+                    <div className="detail-box full-width" style={{ background: "#eff6ff", border: "1px solid #bfdbfe", padding: "15px", borderRadius: "8px" }}>
+                      <small style={{ color: "#1d4ed8", fontWeight: "bold" }}>COMMISSION EARNED TILL NOW</small>
+                      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(135px, 1fr))", gap: "10px", marginTop: "10px" }}>
+                        <CommissionMetric label="Trips" value={selectedCommissionSummary.tripCount} />
+                        <CommissionMetric label="Booking Amount" value={`Rs ${selectedCommissionSummary.bookingAmount.toLocaleString("en-IN")}`} />
+                        <CommissionMetric label="Rate" value={`${selectedCommissionSummary.commissionRate}%`} />
+                        <CommissionMetric label="Earned" value={`Rs ${Math.round(selectedCommissionSummary.commissionEarned).toLocaleString("en-IN")}`} />
+                        <CommissionMetric label="Approved Deduct" value={`Rs ${Math.round(selectedCommissionSummary.approvedDeductions).toLocaleString("en-IN")}`} />
+                        <CommissionMetric label="Pending Deduct" value={`Rs ${Math.round(selectedCommissionSummary.pendingDeductions).toLocaleString("en-IN")}`} />
+                        <CommissionMetric label="Net Commission" value={`Rs ${Math.round(selectedCommissionSummary.netCommission).toLocaleString("en-IN")}`} highlight />
+                        <CommissionMetric label="This Month" value={`Rs ${Math.round(selectedCommissionSummary.currentMonthCommission).toLocaleString("en-IN")} / ${selectedCommissionSummary.currentMonthTripCount} trips`} />
+                      </div>
+                    </div>
+                  )}
+
                   <DetailBox label="Blood Group" value={selected.bloodGroup} />
                   <DetailBox label="Emergency Contact" value={selected.emergencyContact} />
                   <DetailBox label="Experience" value={selected.experience ? `${selected.experience} Years` : "N/A"} />
@@ -284,6 +369,17 @@ function DetailBox({ label, value }) {
     <div className="detail-box">
       <small>{label}</small>
       <p>{value || "N/A"}</p>
+    </div>
+  );
+}
+
+function CommissionMetric({ label, value, highlight = false }) {
+  return (
+    <div style={{ background: "#ffffff", border: "1px solid #dbeafe", borderRadius: "8px", padding: "10px" }}>
+      <small style={{ color: "#64748b", fontWeight: "800" }}>{label}</small>
+      <p style={{ margin: "4px 0 0", color: highlight ? "#166534" : "#0f172a", fontWeight: "900" }}>
+        {value}
+      </p>
     </div>
   );
 }

@@ -11,6 +11,8 @@ export const BACKUP_COLLECTIONS = [
   "parties",
   "portal_login_otps",
   "portal_users",
+  "portal_activity_logs",
+  "settings",
   "transactions",
   "trips",
   "truck_odo_logs",

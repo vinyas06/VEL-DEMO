@@ -44,12 +44,16 @@ import TripwisePayments from "./pages/TripwisePayments";
 import PaymentIn from "./pages/PaymentIn";
 import PaymentOut from "./pages/PaymentOut";
 import AddExpense from "./pages/AddExpense";
+import DriverSalaryLedger from "./pages/DriverSalaryLedger";
+import DriverAdvances from "./pages/DriverAdvances";
+import SelfTransfer from "./pages/SelfTransfer";
 import ConsolidatedBill from "./pages/ConsolidatedBill";
 
 import Reports from "./pages/Reports";
 import DriverExpense from "./pages/DriverExpense";
 import ExpenseApprovals from "./pages/ExpenseApprovals";
 import { isMainAdminUser } from "./utils/portalAuth";
+import "./darkMode.css";
 
 // --- BULLETPROOF SECURITY WRAPPERS ---
 const ProtectedAdmin = ({ children }) => {
@@ -224,6 +228,9 @@ function App() {
           <Route path="/payment-in" element={<ProtectedAdmin><PaymentIn /></ProtectedAdmin>} />
           <Route path="/payment-out" element={<ProtectedAdmin><PaymentOut /></ProtectedAdmin>} />
           <Route path="/add-expense" element={<ProtectedAdmin><AddExpense /></ProtectedAdmin>} />
+          <Route path="/driver-salary-ledger" element={<ProtectedAdmin><DriverSalaryLedger /></ProtectedAdmin>} />
+          <Route path="/driver-advances" element={<ProtectedAdmin><DriverAdvances /></ProtectedAdmin>} />
+          <Route path="/self-transfer" element={<ProtectedAdmin><SelfTransfer /></ProtectedAdmin>} />
           <Route path="/approve-expenses" element={<ProtectedAdmin><ExpenseApprovals /></ProtectedAdmin>} />
         
           <Route path="/approvals" element={<ProtectedMainAdmin><PendingApprovals /></ProtectedMainAdmin>} />

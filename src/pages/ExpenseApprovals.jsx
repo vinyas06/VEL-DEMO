@@ -11,6 +11,7 @@ function ExpenseApprovals() {
   const [accounts, setAccounts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedAcc, setSelectedAcc] = useState({});
+  const [selectedDeduction, setSelectedDeduction] = useState({});
   const [filterMonth, setFilterMonth] = useState(getCurrentMonthValue());
 
   const fetchData = async () => {
@@ -38,8 +39,10 @@ function ExpenseApprovals() {
   }, []);
 
   const handleApprove = async (submission) => {
+    const deductionSource =
+      selectedDeduction[submission.id] || submission.deductionSource || "admin_account";
     const accountForThis = selectedAcc[submission.id];
-    if (!accountForThis) {
+    if (deductionSource === "admin_account" && !accountForThis) {
       return alert("Please select a Payment Account first!");
     }
 
@@ -58,9 +61,13 @@ function ExpenseApprovals() {
         bookingId: submission.bookingId || "",
         bookingTrackingId: submission.trackingId || submission.tripId || "",
         amount: Number(submission.amount),
-        paymentAccount: accountForThis,
+        paymentAccount: deductionSource === "admin_account" ? accountForThis : "",
+        deductionSource,
         referenceNo: tripReference,
-        notes: `Approved Driver Submission${submission.notes ? `: ${submission.notes}` : ""}`,
+        notes:
+          deductionSource === "driver_salary"
+            ? `Deducted from driver salary/commission${submission.notes ? `: ${submission.notes}` : ""}`
+            : `Approved Driver Submission${submission.notes ? `: ${submission.notes}` : ""}`,
         type: "EXPENSE",
         createdAt: new Date().toISOString(),
       });
@@ -191,9 +198,44 @@ function ExpenseApprovals() {
                     }}
                   >
                     <strong>Driver Notes:</strong> {submission.notes || "None"}
+                    <div style={{ marginTop: "6px" }}>
+                      <strong>Driver Requested:</strong>{" "}
+                      {(submission.deductionSource || "admin_account") === "driver_salary"
+                        ? "Deduct from driver commission"
+                        : "Use driver advance / company account"}
+                    </div>
                   </div>
 
                   <div style={{ borderTop: "1px solid #e2e8f0", paddingTop: "10px" }}>
+                    <label
+                      style={{
+                        fontSize: "0.75rem",
+                        fontWeight: "bold",
+                        color: "#64748b",
+                        display: "block",
+                        marginBottom: "5px",
+                      }}
+                    >
+                      DEDUCT FROM:
+                    </label>
+                    <select
+                      style={{
+                        width: "100%",
+                        padding: "8px",
+                        borderRadius: "6px",
+                        border: "1px solid #cbd5e1",
+                        outline: "none",
+                        marginBottom: "10px",
+                      }}
+                      onChange={(event) =>
+                        setSelectedDeduction({ ...selectedDeduction, [submission.id]: event.target.value })
+                      }
+                      value={selectedDeduction[submission.id] || submission.deductionSource || "admin_account"}
+                    >
+                      <option value="admin_account">Driver Advance / Company Account</option>
+                      <option value="driver_salary">Driver Commission</option>
+                    </select>
+
                     <label
                       style={{
                         fontSize: "0.75rem",
@@ -217,8 +259,13 @@ function ExpenseApprovals() {
                         setSelectedAcc({ ...selectedAcc, [submission.id]: event.target.value })
                       }
                       value={selectedAcc[submission.id] || ""}
+                      disabled={(selectedDeduction[submission.id] || submission.deductionSource || "admin_account") === "driver_salary"}
                     >
-                      <option value="">-- Choose Account --</option>
+                      <option value="">
+                        {(selectedDeduction[submission.id] || submission.deductionSource || "admin_account") === "driver_salary"
+                          ? "-- No account needed --"
+                          : "-- Choose Account --"}
+                      </option>
                       {accounts.map((account) => (
                         <option key={account.id} value={account.accountName}>
                           {account.accountName}

@@ -3,11 +3,16 @@ import Navbar from "../components/Navbar";
 import { db } from "../firebase";
 import { collection, addDoc, getDocs } from "firebase/firestore";
 import { TrendingDown, IndianRupee, Wrench, Landmark } from "lucide-react";
+import { getDriverCarryForwardToMonth, getDriverMonthSummary } from "../utils/driverSalary";
 import "./AddDriver.css"; 
 
 function AddExpense() {
   const [accounts, setAccounts] = useState([]);
   const [targets, setTargets] = useState([]); // This will hold drivers or vehicles
+  const [drivers, setDrivers] = useState([]);
+  const [bookings, setBookings] = useState([]);
+  const [transactions, setTransactions] = useState([]);
+  const [submissions, setSubmissions] = useState([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const [form, setForm] = useState({
@@ -21,13 +26,27 @@ function AddExpense() {
     type: "EXPENSE" 
   });
 
-  // Fetch Accounts Once
+  // Fetch Accounts and salary data once
   useEffect(() => {
-    const fetchAccounts = async () => {
-      const snap = await getDocs(collection(db, "accounts"));
-      setAccounts(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    const fetchData = async () => {
+      const [accountSnap, driverSnap, bookingSnap, transactionSnap, submissionSnap] = await Promise.all([
+        getDocs(collection(db, "accounts")),
+        getDocs(collection(db, "drivers")),
+        getDocs(collection(db, "bookings")),
+        getDocs(collection(db, "transactions")),
+        getDocs(collection(db, "driver_submissions")),
+      ]);
+      setAccounts(accountSnap.docs.map(d => ({ id: d.id, ...d.data() })));
+      setDrivers(
+        driverSnap.docs
+          .map(d => ({ id: d.id, ...d.data() }))
+          .sort((a, b) => (a.name || "").localeCompare(b.name || ""))
+      );
+      setBookings(bookingSnap.docs.map(d => ({ id: d.id, ...d.data() })));
+      setTransactions(transactionSnap.docs.map(d => ({ id: d.id, ...d.data() })));
+      setSubmissions(submissionSnap.docs.map(d => ({ id: d.id, ...d.data() })));
     };
-    fetchAccounts();
+    fetchData();
   }, []);
 
   // Dynamically fetch Drivers or Vehicles based on Expense Category
@@ -41,9 +60,7 @@ function AddExpense() {
           const data = snap.docs.map(d => d.data().number);
           setTargets(data);
         } else if (form.category.includes("Driver")) {
-          const snap = await getDocs(collection(db, "drivers"));
-          const data = snap.docs.map(d => d.data().name);
-          setTargets(data);
+          setTargets(drivers.map((driver) => driver.name));
         } else {
           setTargets(["Office / Admin"]); // Fallback for office expenses
         }
@@ -52,22 +69,48 @@ function AddExpense() {
       }
     };
     fetchTargets();
-  }, [form.category]);
+  }, [drivers, form.category]);
 
   const handleChange = (e) => setForm({ ...form, [e.target.name]: e.target.value });
+  const salaryMonth = form.date.slice(0, 7);
+  const selectedDriver = drivers.find((driver) => driver.name === form.targetName);
+  const salarySummary =
+    form.category === "Driver Salary" && selectedDriver
+      ? getDriverMonthSummary(selectedDriver, salaryMonth, bookings, transactions, submissions)
+      : null;
+  const carriedUntilThisMonth =
+    form.category === "Driver Salary" && selectedDriver
+      ? getDriverCarryForwardToMonth(selectedDriver, salaryMonth, bookings, transactions, submissions)
+      : 0;
+  const previousCarryForward = salarySummary
+    ? carriedUntilThisMonth - salarySummary.remainingThisMonth
+    : 0;
+  const salaryBalanceBeforePayment = previousCarryForward + (salarySummary?.remainingThisMonth || 0);
+  const salaryBalanceAfterPayment = salaryBalanceBeforePayment - (Number(form.amount) || 0);
 
   const handleSave = async () => {
     if (!form.amount || !form.paymentAccount || !form.category) {
       return alert("❌ Amount, Category, and Payment Account are required.");
     }
+    if (form.category.includes("Driver") && !form.targetName) {
+      return alert("Please select the driver.");
+    }
 
     setIsSubmitting(true);
     try {
-      await addDoc(collection(db, "transactions"), {
+      const payload = {
         ...form,
+        payeeName: form.category === "Driver Salary" ? form.targetName : "",
+        payee: form.category === "Driver Salary" ? form.targetName : "",
+        driverName: form.category === "Driver Salary" ? form.targetName : "",
+        salaryMonth: form.category === "Driver Salary" ? salaryMonth : "",
+        salaryBalanceBefore: form.category === "Driver Salary" ? salaryBalanceBeforePayment : "",
+        salaryBalanceAfter: form.category === "Driver Salary" ? salaryBalanceAfterPayment : "",
         amount: Number(form.amount),
         createdAt: new Date().toISOString()
-      });
+      };
+      const docRef = await addDoc(collection(db, "transactions"), payload);
+      setTransactions((prev) => [...prev, { id: docRef.id, ...payload }]);
 
       alert(`Expense Recorded! ✅\nVoucher: ${form.voucherNo}`);
       setForm({
@@ -138,6 +181,40 @@ function AddExpense() {
             <label>Amount (₹) *</label>
             <input name="amount" type="number" placeholder="0.00" value={form.amount} onChange={handleChange} style={{ borderColor: "#f97316", borderWidth: "2px" }} />
           </div>
+
+          {salarySummary && (
+            <div className="full-width" style={{ background: "#eff6ff", border: "1px solid #bfdbfe", borderRadius: "10px", padding: "14px", display: "grid", gap: "12px" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", gap: "1rem", flexWrap: "wrap" }}>
+                <strong style={{ color: "#1e40af" }}>{form.targetName} Salary / Commission Summary</strong>
+                <span style={{ color: "#64748b", fontWeight: "800" }}>{salaryMonth}</span>
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: "10px" }}>
+                {[
+                  ["Fixed", salarySummary.fixedSalary],
+                  ["Commission", salarySummary.commissionEarned],
+                  ["Deductions", salarySummary.totalDeductions],
+                  ["Paid This Month", salarySummary.paidSalary],
+                  ["Prev. Carry", previousCarryForward],
+                  ["To Pay Now", salaryBalanceBeforePayment],
+                  ["After Payment", salaryBalanceAfterPayment],
+                ].map(([label, value]) => (
+                  <div key={label} style={{ background: "#ffffff", border: "1px solid #dbeafe", borderRadius: "8px", padding: "10px" }}>
+                    <small style={{ color: "#64748b", fontWeight: "800", textTransform: "uppercase" }}>{label}</small>
+                    <strong style={{ display: "block", color: value < 0 ? "#b91c1c" : "#0f172a", marginTop: "4px" }}>
+                      Rs {Math.round(value).toLocaleString("en-IN")}
+                    </strong>
+                  </div>
+                ))}
+              </div>
+              <button
+                type="button"
+                onClick={() => setForm((prev) => ({ ...prev, amount: Math.max(0, Math.round(salaryBalanceBeforePayment)).toString() }))}
+                style={{ justifySelf: "start", border: "0", borderRadius: "8px", background: "#2563eb", color: "white", padding: "0.65rem 0.9rem", fontWeight: "800", cursor: "pointer" }}
+              >
+                Fill Full Remaining
+              </button>
+            </div>
+          )}
 
           {/* 🔥 STRICT ACCOUNT SELECTION */}
           <div className="input-group full-width">

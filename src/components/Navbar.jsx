@@ -3,7 +3,7 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import {
   Briefcase, ClipboardList, FileBarChart, FileText, Landmark, LayoutDashboard,
   LogOut, MapPin, Menu, PieChart, ReceiptIndianRupee, Settings as SettingsIcon, ShieldCheck, Truck, Users, Wallet, X,
-  ChevronDown, ChevronRight, Activity, DatabaseBackup
+  ChevronDown, ChevronRight, Activity, DatabaseBackup, Moon, Sun
 } from "lucide-react";
 import logo from "../assets/vel-logo-transparent.png";
 import { getCompanyByKey, isMainAdminUser } from "../utils/portalAuth";
@@ -65,6 +65,9 @@ const getAdminSections = (user) => [
       { to: "/transactions", label: "Transactions", icon: Wallet },
       { to: "/payment-in", label: "Payment In", icon: Landmark },
       { to: "/payment-out", label: "Payment Out", icon: Landmark },
+      { to: "/self-transfer", label: "Self Transfer", icon: Landmark },
+      { to: "/driver-advances", label: "Driver Advances", icon: Wallet },
+      { to: "/driver-salary-ledger", label: "Driver Salary Ledger", icon: ReceiptIndianRupee },
       { to: "/add-expense", label: "Add Expense", icon: Wallet },
       { to: "/approve-expenses", label: "Approve Expenses", icon: ClipboardList },
       { to: "/consolidated-bill", label: "Consolidated Bill", icon: FileText },
@@ -89,6 +92,8 @@ function Navbar() {
   const user = JSON.parse(localStorage.getItem("user") || "{}"); 
   const company = getCompanyByKey(user?.companyKey);
   const adminSections = getAdminSections(user);
+  const themeStorageKey = `theme:${user?.companyKey || "default"}:${user?.loginId || user?.email || user?.name || "guest"}`;
+  const [isDarkMode, setIsDarkMode] = useState(() => localStorage.getItem(themeStorageKey) === "dark");
 
   const getActiveSectionTitle = (pathname) =>
     adminSections.find((section) =>
@@ -102,6 +107,11 @@ function Navbar() {
     const intervalId = window.setInterval(updateClock, 60000);
     return () => window.clearInterval(intervalId);
   }, []);
+
+  useEffect(() => {
+    document.body.classList.toggle("dark-mode", isDarkMode);
+    localStorage.setItem(themeStorageKey, isDarkMode ? "dark" : "light");
+  }, [isDarkMode, themeStorageKey]);
 
   // Sync Layout for Desktop Sidebar Pushing
   useEffect(() => {
@@ -139,6 +149,7 @@ function Navbar() {
   };
 
   const handleMenuToggle = () => setIsOpen((previous) => !previous);
+  const handleThemeToggle = () => setIsDarkMode((previous) => !previous);
 
   const handleMenuLinkClick = (sectionTitle) => {
     setExpandedSections({ [sectionTitle]: true });
@@ -178,6 +189,9 @@ function Navbar() {
             <Link to="/driver-expense" className="top-action-link">
               <ClipboardList size={18} /> Submit Expense
             </Link>
+            <button className="theme-toggle-btn" onClick={handleThemeToggle} title={isDarkMode ? "Light mode" : "Dark mode"}>
+              {isDarkMode ? <Sun size={18} /> : <Moon size={18} />}
+            </button>
             <button className="logout-btn" onClick={handleLogout} title="Logout">
               <LogOut size={18} />
             </button>
@@ -212,6 +226,9 @@ function Navbar() {
               <span className="user-badge">{isMainAdminUser(user) ? "Main Admin" : "Portal User"}</span>
               <span className="user-email">{user?.email || "Logged in"}</span>
             </div>
+            <button className="theme-toggle-btn" onClick={handleThemeToggle} title={isDarkMode ? "Light mode" : "Dark mode"}>
+              {isDarkMode ? <Sun size={18} /> : <Moon size={18} />}
+            </button>
             <button className="logout-btn" onClick={handleLogout} title="Logout">
               <LogOut size={18} />
             </button>

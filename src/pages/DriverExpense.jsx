@@ -1,13 +1,54 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import Navbar from "../components/Navbar";
 import { db } from "../firebase";
-import { collection, addDoc, getDocs, query, where } from "firebase/firestore";
-import { Send, ClipboardList, Link2, Truck } from "lucide-react";
+import { collection, addDoc, getDocs, query, where, or } from "firebase/firestore";
+import { Send, ClipboardList, Link2, Truck, WalletCards, ArrowLeft } from "lucide-react";
 import "./AddDriver.css";
+
+const getDriverName = (record = {}) => record.driverName || record.payeeName || record.payee || "";
+const toNumber = (value) => {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : 0;
+};
+
+const buildDriverWallet = (driverName, transactions = [], submissions = []) => {
+  const driverTransactions = transactions.filter((transaction) => getDriverName(transaction) === driverName);
+  const givenByAdmin = driverTransactions
+    .filter((transaction) => transaction.category === "Driver Advance")
+    .reduce((sum, transaction) => sum + toNumber(transaction.amount), 0);
+  const approvedSpent = driverTransactions
+    .filter(
+      (transaction) =>
+        transaction.category !== "Driver Advance" &&
+        transaction.category !== "Driver Salary" &&
+        transaction.deductionSource !== "driver_salary" &&
+        transaction.type !== "IN" &&
+        transaction.type !== "TRANSFER_IN"
+    )
+    .reduce((sum, transaction) => sum + toNumber(transaction.amount), 0);
+  const pendingSpent = submissions
+    .filter(
+      (submission) =>
+        getDriverName(submission) === driverName &&
+        submission.deductionSource !== "driver_salary"
+    )
+    .reduce((sum, submission) => sum + toNumber(submission.amount), 0);
+
+  return {
+    givenByAdmin,
+    approvedSpent,
+    pendingSpent,
+    available: givenByAdmin - approvedSpent - pendingSpent,
+  };
+};
 
 function DriverExpense() {
   const user = JSON.parse(localStorage.getItem("user"));
+  const navigate = useNavigate();
   const [trips, setTrips] = useState([]);
+  const [wallet, setWallet] = useState({ givenByAdmin: 0, approvedSpent: 0, pendingSpent: 0, available: 0 });
+  const [submissions, setSubmissions] = useState([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [form, setForm] = useState({
     date: new Date().toISOString().split("T")[0],
@@ -16,6 +57,7 @@ function DriverExpense() {
     trackingId: "",
     vehicleNumber: "",
     amount: "",
+    deductionSource: "admin_account",
     notes: "",
   });
 
@@ -26,12 +68,23 @@ function DriverExpense() {
       }
 
       try {
-        const tripQuery = query(collection(db, "bookings"), where("driver", "==", user.name));
-        const tripSnap = await getDocs(tripQuery);
+        const tripQuery = query(
+          collection(db, "bookings"),
+          or(where("driver", "==", user.name), where("driver2", "==", user.name))
+        );
+        const [tripSnap, transactionSnap, submissionSnap] = await Promise.all([
+          getDocs(tripQuery),
+          getDocs(collection(db, "transactions")),
+          getDocs(collection(db, "driver_submissions")),
+        ]);
         const tripData = tripSnap.docs
           .map((docItem) => ({ id: docItem.id, ...docItem.data() }))
           .sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+        const transactionData = transactionSnap.docs.map((docItem) => ({ id: docItem.id, ...docItem.data() }));
+        const submissionData = submissionSnap.docs.map((docItem) => ({ id: docItem.id, ...docItem.data() }));
         setTrips(tripData);
+        setSubmissions(submissionData);
+        setWallet(buildDriverWallet(user.name, transactionData, submissionData));
       } catch (error) {
         console.error("Error fetching driver trips:", error);
       }
@@ -53,19 +106,30 @@ function DriverExpense() {
   };
 
   const handleSend = async () => {
-    if (!form.amount || !form.vehicleNumber) {
-      return alert("Please enter Amount and Vehicle Number");
+    if (!form.amount) {
+      return alert("Please enter Amount.");
     }
 
     setIsSubmitting(true);
     try {
-      await addDoc(collection(db, "driver_submissions"), {
+      const payload = {
         ...form,
         driverName: user?.name || "Unknown Driver",
         amount: Number(form.amount),
+        deductionSource: form.deductionSource,
         status: "Pending Approval",
         createdAt: new Date().toISOString(),
-      });
+      };
+      const docRef = await addDoc(collection(db, "driver_submissions"), payload);
+      const updatedSubmissions = [...submissions, { id: docRef.id, ...payload }];
+      setSubmissions(updatedSubmissions);
+      if (form.deductionSource !== "driver_salary") {
+        setWallet((prev) => ({
+          ...prev,
+          pendingSpent: prev.pendingSpent + Number(form.amount),
+          available: prev.givenByAdmin - prev.approvedSpent - (prev.pendingSpent + Number(form.amount)),
+        }));
+      }
 
       alert("Expense sent for Admin Approval!");
       setForm({
@@ -75,6 +139,7 @@ function DriverExpense() {
         trackingId: "",
         vehicleNumber: "",
         amount: "",
+        deductionSource: "admin_account",
         notes: "",
       });
     } catch (error) {
@@ -97,6 +162,50 @@ function DriverExpense() {
               <p>Send Fuel, Toll, or Batta bills to Admin for approval.</p>
             </div>
           </div>
+          <button
+            type="button"
+            onClick={() => navigate("/driver-dashboard")}
+            style={{
+              border: "1px solid #cbd5e1",
+              background: "#ffffff",
+              color: "#334155",
+              borderRadius: "8px",
+              padding: "0.65rem 0.9rem",
+              display: "inline-flex",
+              alignItems: "center",
+              gap: "0.45rem",
+              fontWeight: "800",
+              cursor: "pointer",
+            }}
+          >
+            <ArrowLeft size={18} /> Back
+          </button>
+        </div>
+
+        <div
+          className="full-width"
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))",
+            gap: "12px",
+            marginBottom: "18px",
+          }}
+        >
+          {[
+            ["Given", wallet.givenByAdmin, "#0f766e"],
+            ["Approved Spent", wallet.approvedSpent, "#b91c1c"],
+            ["Pending", wallet.pendingSpent, "#b45309"],
+            ["Available", wallet.available, wallet.available < 0 ? "#b91c1c" : "#166534"],
+          ].map(([label, value, color]) => (
+            <div key={label} style={{ background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: "10px", padding: "12px" }}>
+              <span style={{ color: "#64748b", fontSize: "0.76rem", fontWeight: "800", textTransform: "uppercase", display: "flex", alignItems: "center", gap: "6px" }}>
+                <WalletCards size={14} /> {label}
+              </span>
+              <strong style={{ display: "block", color, fontSize: "1.1rem", marginTop: "5px" }}>
+                Rs {toNumber(value).toLocaleString("en-IN")}
+              </strong>
+            </div>
+          ))}
         </div>
 
         <div className="form-grid">
@@ -129,7 +238,7 @@ function DriverExpense() {
           </div>
 
           <div className="input-group">
-            <label>Vehicle Number</label>
+            <label>Vehicle Number (Optional)</label>
             <input
               placeholder="e.g. KA19 AB 1234"
               value={form.vehicleNumber}
@@ -145,6 +254,17 @@ function DriverExpense() {
               value={form.amount}
               onChange={(event) => setForm({ ...form, amount: event.target.value })}
             />
+          </div>
+
+          <div className="input-group">
+            <label>Deduct From</label>
+            <select
+              value={form.deductionSource}
+              onChange={(event) => setForm({ ...form, deductionSource: event.target.value })}
+            >
+              <option value="admin_account">Use My Advance / Company Account</option>
+              <option value="driver_salary">Deduct From My Commission</option>
+            </select>
           </div>
 
           {form.trackingId && (

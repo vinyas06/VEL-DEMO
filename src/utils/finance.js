@@ -19,6 +19,14 @@ const getTimestamp = (record = {}) => {
 
 const normalizeKey = (value) => String(value || "").trim().toLowerCase();
 
+export const isMoneyInTransaction = (transaction = {}) =>
+  transaction.type === "IN" || transaction.type === "TRANSFER_IN";
+
+export const isSelfTransferTransaction = (transaction = {}) =>
+  transaction.type === "TRANSFER_IN" ||
+  transaction.type === "TRANSFER_OUT" ||
+  transaction.category === "Self Transfer";
+
 const getBookingKeys = (booking = {}) =>
   [booking.id, booking.trackingId, booking.lrNumber]
     .filter(Boolean)
@@ -290,14 +298,18 @@ export const getAccountFinancialSummary = (accounts = [], transactions = []) => 
     }
 
     const amount = toNumber(transaction.amount);
-    if (transaction.type === "IN") {
+    if (isMoneyInTransaction(transaction)) {
       targetAccount.liveBalance += amount;
-      totalIn += amount;
+      if (!isSelfTransferTransaction(transaction)) {
+        totalIn += amount;
+      }
       return;
     }
 
     targetAccount.liveBalance -= amount;
-    totalOut += amount;
+    if (!isSelfTransferTransaction(transaction)) {
+      totalOut += amount;
+    }
   });
 
   const cashAccounts = clonedAccounts.filter((account) =>

@@ -1,0 +1,282 @@
+body.dark-mode {
+  background: #0f172a !important;
+  color: #e2e8f0 !important;
+}
+
+body.dark-mode .page-bg,
+body.dark-mode .list-page-bg,
+body.dark-mode .dashboard-page,
+body.dark-mode .reports-page,
+body.dark-mode .tripwise-page,
+body.dark-mode .driver-mobile-bg,
+body.dark-mode .track-page,
+body.dark-mode .page-background {
+  background: #0f172a !important;
+  background-color: #0f172a !important;
+  color: #e2e8f0 !important;
+}
+
+body.dark-mode .admin-form-card,
+body.dark-mode .list-container,
+body.dark-mode .dashboard-container,
+body.dark-mode .booking-card,
+body.dark-mode .driver-card,
+body.dark-mode .vehicle-card,
+body.dark-mode .party-card,
+body.dark-mode .shipment-card,
+body.dark-mode .mobile-trip-card,
+body.dark-mode .stat-card,
+body.dark-mode .chart-section,
+body.dark-mode .reports-hero,
+body.dark-mode .reports-panel,
+body.dark-mode .reports-table-panel,
+body.dark-mode .summary-card,
+body.dark-mode .category-report-card,
+body.dark-mode .account-report-card,
+body.dark-mode .trip-payment-card,
+body.dark-mode .tripwise-summary,
+body.dark-mode .tripwise-filters,
+body.dark-mode .filter-bar,
+body.dark-mode .filter-field,
+body.dark-mode .financial-row,
+body.dark-mode .financial-grid,
+body.dark-mode .compliance-grid,
+body.dark-mode .modal-view-grid,
+body.dark-mode .modal-content,
+body.dark-mode .modal-box,
+body.dark-mode .pro-modal-content,
+body.dark-mode .detail-box,
+body.dark-mode .details-grid,
+body.dark-mode .payment-breakup,
+body.dark-mode .payment-line,
+body.dark-mode .pay-plan-strip,
+body.dark-mode .earnings-breakdown-grid > div,
+body.dark-mode .earnings-trip-row,
+body.dark-mode .earnings-empty,
+body.dark-mode .selected-fuel-box,
+body.dark-mode .fuel-list-item,
+body.dark-mode .box-highlight,
+body.dark-mode .route-info,
+body.dark-mode .trip-route,
+body.dark-mode .route-display,
+body.dark-mode .tracking-timeline,
+body.dark-mode .public-details-grid,
+body.dark-mode .track-form-container,
+body.dark-mode .search-section,
+body.dark-mode .captcha-box,
+body.dark-mode .right-sidebar,
+body.dark-mode .sidebar-header,
+body.dark-mode .sidebar-link,
+body.dark-mode table,
+body.dark-mode [style*="background"],
+body.dark-mode [style*="background-color"] {
+  background: #111827 !important;
+  background-color: #111827 !important;
+  border-color: #334155 !important;
+  color: #e2e8f0 !important;
+  box-shadow: none !important;
+}
+
+body.dark-mode .reports-page {
+  background:
+    radial-gradient(circle at top right, rgba(59, 130, 246, 0.13), transparent 24%),
+    linear-gradient(180deg, #0f172a 0%, #111827 100%) !important;
+}
+
+body.dark-mode thead,
+body.dark-mode thead tr,
+body.dark-mode th,
+body.dark-mode .reports-table thead th,
+body.dark-mode .reports-table tbody tr:hover,
+body.dark-mode .card-top,
+body.dark-mode .driver-card-top,
+body.dark-mode .vehicle-card-top,
+body.dark-mode .party-card-top,
+body.dark-mode .modal-header,
+body.dark-mode .modal-actions,
+body.dark-mode .section-title,
+body.dark-mode .section-divider,
+body.dark-mode .lr-title-bar,
+body.dark-mode .tracking-id,
+body.dark-mode .category-card-count {
+  background: #1e293b !important;
+  background-color: #1e293b !important;
+  border-color: #334155 !important;
+  color: #e2e8f0 !important;
+}
+
+body.dark-mode td,
+body.dark-mode .reports-table tbody td,
+body.dark-mode .lr-cargo-table td,
+body.dark-mode .lr-cargo-table th,
+body.dark-mode .lr-calc-table td,
+body.dark-mode .account-card-row,
+body.dark-mode [style*="border-bottom"],
+body.dark-mode [style*="border-top"],
+body.dark-mode [style*="border:"] {
+  border-color: #334155 !important;
+}
+
+body.dark-mode input,
+body.dark-mode select,
+body.dark-mode textarea,
+body.dark-mode .modal-input,
+body.dark-mode .login-select {
+  background: #0f172a !important;
+  background-color: #0f172a !important;
+  border-color: #475569 !important;
+  color: #e2e8f0 !important;
+}
+
+body.dark-mode input::placeholder,
+body.dark-mode textarea::placeholder {
+  color: #64748b !important;
+}
+
+body.dark-mode h1,
+body.dark-mode h2,
+body.dark-mode h3,
+body.dark-mode h4,
+body.dark-mode h5,
+body.dark-mode p,
+body.dark-mode label,
+body.dark-mode strong,
+body.dark-mode td,
+body.dark-mode th,
+body.dark-mode .list-header h2,
+body.dark-mode .dashboard-header h1,
+body.dark-mode .reports-hero h1,
+body.dark-mode .reports-panel h2,
+body.dark-mode .reports-table-panel h2,
+body.dark-mode .vehicle-basic-info h3,
+body.dark-mode .party-basic-info h3,
+body.dark-mode .driver-basic-info h3,
+body.dark-mode .summary-card-value,
+body.dark-mode .account-card-value,
+body.dark-mode .category-card-name,
+body.dark-mode .category-card-stat strong,
+body.dark-mode .account-card-row strong,
+body.dark-mode .txn-main,
+body.dark-mode .detail-box p,
+body.dark-mode .financial-heading,
+body.dark-mode .compliance-heading,
+body.dark-mode .sidebar-header h2,
+body.dark-mode .sidebar-link,
+body.dark-mode [style*="color: #0f172a"],
+body.dark-mode [style*="color:#0f172a"],
+body.dark-mode [style*="color: #1e293b"],
+body.dark-mode [style*="color:#1e293b"],
+body.dark-mode [style*="color: #334155"],
+body.dark-mode [style*="color:#334155"],
+body.dark-mode [style*="color: rgb(15"],
+body.dark-mode [style*="color: rgb(30"],
+body.dark-mode [style*="color: rgb(51"] {
+  color: #e2e8f0 !important;
+}
+
+body.dark-mode small,
+body.dark-mode .list-header p,
+body.dark-mode .dashboard-header p,
+body.dark-mode .reports-hero p,
+body.dark-mode .reports-panel p,
+body.dark-mode .reports-table-panel p,
+body.dark-mode .header-title p,
+body.dark-mode .summary-card-note,
+body.dark-mode .account-card-note,
+body.dark-mode .category-card-stat,
+body.dark-mode .txn-sub,
+body.dark-mode .info-row,
+body.dark-mode .detail-item,
+body.dark-mode .top-10-title,
+body.dark-mode .sidebar-label,
+body.dark-mode .sidebar-section-header,
+body.dark-mode .user-email,
+body.dark-mode [style*="color: #64748b"],
+body.dark-mode [style*="color:#64748b"],
+body.dark-mode [style*="color: #475569"],
+body.dark-mode [style*="color:#475569"],
+body.dark-mode [style*="color: #94a3b8"],
+body.dark-mode [style*="color:#94a3b8"],
+body.dark-mode [style*="color: rgb(71"],
+body.dark-mode [style*="color: rgb(100"],
+body.dark-mode [style*="color: rgb(148"] {
+  color: #94a3b8 !important;
+}
+
+body.dark-mode .btn-view,
+body.dark-mode .btn-cancel,
+body.dark-mode .reports-reset-btn,
+body.dark-mode .clear-btn,
+body.dark-mode .clear-filter-btn {
+  background: #1e293b !important;
+  border-color: #475569 !important;
+  color: #e2e8f0 !important;
+}
+
+body.dark-mode .btn-edit,
+body.dark-mode .vehicle-icon-wrapper,
+body.dark-mode .party-icon-wrapper,
+body.dark-mode .text-blue {
+  background: #172554 !important;
+  border-color: #1d4ed8 !important;
+  color: #93c5fd !important;
+}
+
+body.dark-mode .status-badge.active,
+body.dark-mode .txn-pill.in,
+body.dark-mode .live-badge {
+  background: #064e3b !important;
+  color: #bbf7d0 !important;
+}
+
+body.dark-mode .status-badge.inactive,
+body.dark-mode .status-badge.blacklisted,
+body.dark-mode .status-badge.sold,
+body.dark-mode .txn-pill.out,
+body.dark-mode .fallback-badge {
+  background: #7f1d1d !important;
+  color: #fecaca !important;
+}
+
+body.dark-mode .status-badge.maintenance,
+body.dark-mode .status-badge.pending {
+  background: #713f12 !important;
+  color: #fef3c7 !important;
+}
+
+body.dark-mode .text-green,
+body.dark-mode .txn-amount.in {
+  color: #86efac !important;
+}
+
+body.dark-mode .text-red,
+body.dark-mode .txn-amount.out,
+body.dark-mode .box-warning p {
+  color: #fca5a5 !important;
+}
+
+body.dark-mode .driver-wallet-card,
+body.dark-mode .earnings-card-pro,
+body.dark-mode .driver-commission-nav,
+body.dark-mode .reports-export-btn,
+body.dark-mode .btn-submit,
+body.dark-mode .btn-save,
+body.dark-mode .modal-submit-btn,
+body.dark-mode .track-submit-btn,
+body.dark-mode .login-btn,
+body.dark-mode .top-action-link,
+body.dark-mode .sidebar-link.active-link {
+  color: #ffffff !important;
+}
+
+body.dark-mode .driver-wallet-card {
+  background: linear-gradient(135deg, #1d4ed8 0%, #0891b2 100%) !important;
+}
+
+body.dark-mode .earnings-card-pro {
+  background: linear-gradient(135deg, #0f766e 0%, #0f9f6e 100%) !important;
+}
+
+body.dark-mode .sidebar-link.active-link {
+  background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%) !important;
+}

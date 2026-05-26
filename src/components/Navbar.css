@@ -121,7 +121,8 @@ body {
 
 .logout-btn,
 .menu-toggle-btn,
-.sidebar-close {
+.sidebar-close,
+.theme-toggle-btn {
   border: none;
   border-radius: 14px;
   display: inline-flex;
@@ -132,7 +133,8 @@ body {
 }
 
 .logout-btn,
-.menu-toggle-btn {
+.menu-toggle-btn,
+.theme-toggle-btn {
   width: 46px;
   height: 46px;
   color: #e2e8f0;
@@ -142,6 +144,7 @@ body {
 
 .logout-btn:hover,
 .menu-toggle-btn:hover,
+.theme-toggle-btn:hover,
 .sidebar-close:hover {
   transform: translateY(-1px);
   background: #1d4ed8;

@@ -5,6 +5,7 @@ import { collection, getDocs } from "firebase/firestore";
 import { ArrowDownLeft, ArrowUpRight, Wallet, Printer, Download, Calendar } from "lucide-react";
 import { fetchCompanyProfile } from "../utils/companyProfile";
 import { getCurrentMonthValue, getRecordDateInput } from "../utils/dateRange";
+import { isMoneyInTransaction } from "../utils/finance";
 import "./BookingList.css"; 
 
 const getValidTime = (value) => {
@@ -79,7 +80,7 @@ function TransactionList() {
   const ledgerData = [...filteredTrx]
   .sort((a, b) => getTransactionSortTime(a) - getTransactionSortTime(b))
   .map(trx => {
-    if (trx.type === "IN") {
+    if (isMoneyInTransaction(trx)) {
       currentRunningBalance += Number(trx.amount);
     } else {
       currentRunningBalance -= Number(trx.amount); // OUT or EXPENSE
@@ -209,15 +210,15 @@ function TransactionList() {
                       </td>
                       <td style={{ padding: "1rem" }}>
                         <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "4px" }}>
-                          {trx.type === "IN" ? <ArrowDownLeft size={16} color="#10b981" /> : <ArrowUpRight size={16} color="#ef4444" />}
+                          {isMoneyInTransaction(trx) ? <ArrowDownLeft size={16} color="#10b981" /> : <ArrowUpRight size={16} color="#ef4444" />}
                           <strong style={{ color: "#334155" }}>{trx.partyName || trx.payeeName || trx.targetName || trx.payee || "General"}</strong>
                         </div>
                         <small style={{ color: "#64748b", display: "block" }}>{trx.category || "Payment"} {trx.notes ? `| ${trx.notes}` : ""}</small>
                       </td>
                       <td style={{ padding: "1rem", color: "#475569", fontWeight: "500" }}>{trx.paymentAccount || trx.paymentMode}</td>
                       
-                      <td style={{ padding: "1rem", fontWeight: "bold", color: "#10b981", fontSize: "1.1rem" }}>{trx.type === "IN" ? `₹${trx.amount}` : "-"}</td>
-                      <td style={{ padding: "1rem", fontWeight: "bold", color: "#ef4444", fontSize: "1.1rem" }}>{trx.type !== "IN" ? `₹${trx.amount}` : "-"}</td>
+                      <td style={{ padding: "1rem", fontWeight: "bold", color: "#10b981", fontSize: "1.1rem" }}>{isMoneyInTransaction(trx) ? `₹${trx.amount}` : "-"}</td>
+                      <td style={{ padding: "1rem", fontWeight: "bold", color: "#ef4444", fontSize: "1.1rem" }}>{!isMoneyInTransaction(trx) ? `₹${trx.amount}` : "-"}</td>
                       
                       {selectedAccount !== "All" && (
                         <td style={{ padding: "1rem", fontWeight: "bold", background: "#f8fafc", color: "#1e293b", fontSize: "1.1rem" }}>₹{trx.runningBalance}</td>
@@ -354,7 +355,7 @@ function TransactionList() {
                 marginBottom: "30px"
               }}>
                 <h2 style={{ margin: "0", color: "#1e293b", fontSize: "20px" }}>
-                  {receiptModal.transaction.type === "IN" ? "RECEIPT" : "PAYMENT VOUCHER"}
+                  {isMoneyInTransaction(receiptModal.transaction) ? "RECEIPT" : "PAYMENT VOUCHER"}
                 </h2>
                 <p style={{ margin: "5px 0 0 0", color: "#64748b" }}>
                   Voucher No: {receiptModal.transaction.voucherNo}
@@ -377,7 +378,7 @@ function TransactionList() {
                       <strong>Date:</strong> {receiptModal.transaction.date}
                     </div>
                     <div style={{ marginBottom: "5px" }}>
-                      <strong>Type:</strong> {receiptModal.transaction.type === "IN" ? "Credit" : "Debit"}
+                      <strong>Type:</strong> {isMoneyInTransaction(receiptModal.transaction) ? "Credit" : "Debit"}
                     </div>
                     <div style={{ marginBottom: "5px" }}>
                       <strong>Amount:</strong> ₹{receiptModal.transaction.amount}
