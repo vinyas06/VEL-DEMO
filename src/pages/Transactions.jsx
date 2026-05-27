@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
 import Navbar from "../components/Navbar";
 import { db } from "../firebase";
-import { collection, getDocs } from "firebase/firestore";
-import { ArrowDownLeft, ArrowUpRight, Wallet, Printer, Download, Calendar } from "lucide-react";
+import { collection, doc, getDocs, updateDoc } from "firebase/firestore";
+import { ArrowDownLeft, ArrowUpRight, Wallet, Printer, Download, Calendar, Edit, Save, X } from "lucide-react";
 import { fetchCompanyProfile } from "../utils/companyProfile";
 import { getCurrentMonthValue, getRecordDateInput } from "../utils/dateRange";
 import { isMoneyInTransaction } from "../utils/finance";
@@ -35,6 +35,8 @@ function TransactionList() {
   const [loading, setLoading] = useState(true);
   const [companySettings, setCompanySettings] = useState({});
   const [receiptModal, setReceiptModal] = useState({ open: false, transaction: null });
+  const [editModal, setEditModal] = useState({ open: false, transactionId: null, form: {} });
+  const [isSavingEdit, setIsSavingEdit] = useState(false);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -131,6 +133,75 @@ function TransactionList() {
     printReceipt();
   };
 
+  const openEditModal = (transaction) => {
+    setEditModal({
+      open: true,
+      transactionId: transaction.id,
+      form: {
+        voucherNo: transaction.voucherNo || "",
+        date: transaction.date || "",
+        type: transaction.type || "EXPENSE",
+        category: transaction.category || "",
+        amount: transaction.amount || "",
+        paymentAccount: transaction.paymentAccount || transaction.paymentMode || "",
+        referenceNo: transaction.referenceNo || "",
+        partyName: transaction.partyName || "",
+        payeeName: transaction.payeeName || "",
+        payee: transaction.payee || "",
+        targetName: transaction.targetName || "",
+        notes: transaction.notes || "",
+      },
+    });
+  };
+
+  const updateEditField = (field, value) => {
+    setEditModal((prev) => ({
+      ...prev,
+      form: {
+        ...prev.form,
+        [field]: value,
+      },
+    }));
+  };
+
+  const closeEditModal = () => {
+    setEditModal({ open: false, transactionId: null, form: {} });
+  };
+
+  const handleSaveEdit = async () => {
+    if (!editModal.transactionId) return;
+
+    const amount = Number(editModal.form.amount);
+    if (!editModal.form.date || !amount || amount <= 0) {
+      return alert("Please enter a valid date and amount.");
+    }
+
+    setIsSavingEdit(true);
+    try {
+      const payload = {
+        ...editModal.form,
+        amount,
+        updatedAt: new Date().toISOString(),
+      };
+
+      await updateDoc(doc(db, "transactions", editModal.transactionId), payload);
+      setTransactions((prev) =>
+        prev.map((transaction) =>
+          transaction.id === editModal.transactionId
+            ? { ...transaction, ...payload }
+            : transaction
+        )
+      );
+      closeEditModal();
+      alert("Transaction updated successfully.");
+    } catch (error) {
+      console.error("Error updating transaction:", error);
+      alert("Error updating transaction.");
+    } finally {
+      setIsSavingEdit(false);
+    }
+  };
+
   return (
     <div className="list-page-bg">
       <Navbar />
@@ -225,23 +296,42 @@ function TransactionList() {
                       )}
                       
                       <td style={{ padding: "1rem" }}>
-                        <button 
-                          onClick={() => openReceipt(trx)}
-                          style={{ 
-                            background: "#3b82f6", 
-                            color: "white", 
-                            border: "none", 
-                            padding: "6px 12px", 
-                            borderRadius: "6px", 
-                            cursor: "pointer",
-                            display: "flex",
-                            alignItems: "center",
-                            gap: "4px",
-                            fontSize: "0.8rem"
-                          }}
-                        >
-                          <Printer size={14} /> Receipt
-                        </button>
+                        <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+                          <button 
+                            onClick={() => openReceipt(trx)}
+                            style={{ 
+                              background: "#3b82f6", 
+                              color: "white", 
+                              border: "none", 
+                              padding: "6px 10px", 
+                              borderRadius: "6px", 
+                              cursor: "pointer",
+                              display: "flex",
+                              alignItems: "center",
+                              gap: "4px",
+                              fontSize: "0.8rem"
+                            }}
+                          >
+                            <Printer size={14} /> Receipt
+                          </button>
+                          <button
+                            onClick={() => openEditModal(trx)}
+                            style={{
+                              background: "#f59e0b",
+                              color: "white",
+                              border: "none",
+                              padding: "6px 10px",
+                              borderRadius: "6px",
+                              cursor: "pointer",
+                              display: "flex",
+                              alignItems: "center",
+                              gap: "4px",
+                              fontSize: "0.8rem"
+                            }}
+                          >
+                            <Edit size={14} /> Edit
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))
@@ -251,6 +341,86 @@ function TransactionList() {
           </div>
         )}
       </div>
+
+      {editModal.open && (
+        <div className="modal-overlay">
+          <div className="modal-box edit-modal" style={{ maxWidth: "760px" }}>
+            <div className="modal-header">
+              <h3>Edit Transaction</h3>
+              <button onClick={closeEditModal}><X size={20} /></button>
+            </div>
+            <div className="edit-grid modal-body">
+              <div>
+                <label>Voucher No.</label>
+                <input className="modal-input" value={editModal.form.voucherNo || ""} onChange={(e) => updateEditField("voucherNo", e.target.value)} />
+              </div>
+              <div>
+                <label>Date</label>
+                <input type="date" className="modal-input" value={editModal.form.date || ""} onChange={(e) => updateEditField("date", e.target.value)} />
+              </div>
+              <div>
+                <label>Type</label>
+                <select className="modal-input" value={editModal.form.type || "EXPENSE"} onChange={(e) => updateEditField("type", e.target.value)}>
+                  <option value="IN">IN / Credit</option>
+                  <option value="OUT">OUT / Debit</option>
+                  <option value="EXPENSE">Expense</option>
+                  <option value="TRANSFER_IN">Transfer In</option>
+                  <option value="TRANSFER_OUT">Transfer Out</option>
+                </select>
+              </div>
+              <div>
+                <label>Category</label>
+                <input className="modal-input" value={editModal.form.category || ""} onChange={(e) => updateEditField("category", e.target.value)} />
+              </div>
+              <div>
+                <label>Amount</label>
+                <input type="number" className="modal-input" value={editModal.form.amount || ""} onChange={(e) => updateEditField("amount", e.target.value)} />
+              </div>
+              <div>
+                <label>Account Used</label>
+                <select className="modal-input" value={editModal.form.paymentAccount || ""} onChange={(e) => updateEditField("paymentAccount", e.target.value)}>
+                  <option value="">-- Select Account --</option>
+                  {accounts.map((account) => (
+                    <option key={account.id} value={account.accountName}>{account.accountName}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label>Party Name</label>
+                <input className="modal-input" value={editModal.form.partyName || ""} onChange={(e) => updateEditField("partyName", e.target.value)} />
+              </div>
+              <div>
+                <label>Payee Name</label>
+                <input className="modal-input" value={editModal.form.payeeName || ""} onChange={(e) => updateEditField("payeeName", e.target.value)} />
+              </div>
+              <div>
+                <label>Payee</label>
+                <input className="modal-input" value={editModal.form.payee || ""} onChange={(e) => updateEditField("payee", e.target.value)} />
+              </div>
+              <div>
+                <label>Target / Vehicle / Driver</label>
+                <input className="modal-input" value={editModal.form.targetName || ""} onChange={(e) => updateEditField("targetName", e.target.value)} />
+              </div>
+              <div>
+                <label>Reference No.</label>
+                <input className="modal-input" value={editModal.form.referenceNo || ""} onChange={(e) => updateEditField("referenceNo", e.target.value)} />
+              </div>
+              <div className="full-width">
+                <label>Notes</label>
+                <input className="modal-input" value={editModal.form.notes || ""} onChange={(e) => updateEditField("notes", e.target.value)} />
+              </div>
+            </div>
+            <button
+              className="modal-submit-btn full-width-btn"
+              style={{ marginTop: "20px", background: "#2563eb", color: "white", padding: "12px", border: "none", borderRadius: "8px", width: "100%", fontWeight: "bold", display: "flex", alignItems: "center", justifyContent: "center", gap: "8px" }}
+              onClick={handleSaveEdit}
+              disabled={isSavingEdit}
+            >
+              <Save size={18} /> {isSavingEdit ? "Saving..." : "Save Transaction"}
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Receipt Modal */}
       {receiptModal.open && receiptModal.transaction && (
