@@ -5,6 +5,7 @@ import { db } from "../firebase";
 import { collection, getDocs, updateDoc, doc } from "firebase/firestore";
 import { Search, Building2, Phone, User, Edit, Eye, IndianRupee, FileText, Mail } from "lucide-react";
 import { buildPartyBalanceMap } from "../utils/finance";
+import { logActivity } from "../utils/activityLog";
 import "./PartyList.css";
 
 function PartyList() {
@@ -52,6 +53,13 @@ function PartyList() {
       };
       
       await updateDoc(doc(db, "parties", selected.id), updatedData);
+      await logActivity(db, {
+        action: "party_updated",
+        module: "parties",
+        summary: `Updated party ${updatedData.name || selected.name || selected.id}`,
+        targetId: selected.id,
+        targetType: "party",
+      });
       setParties(parties.map(p => p.id === selected.id ? updatedData : p));
       
       alert("Party Updated Successfully! ✅");

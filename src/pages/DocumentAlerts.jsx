@@ -3,6 +3,7 @@ import Navbar from "../components/Navbar";
 import { db } from "../firebase";
 import { collection, getDocs, updateDoc, doc } from "firebase/firestore"; // 🔥 Added updateDoc and doc
 import { ShieldAlert, Truck, User, ChevronDown, ChevronUp, AlertOctagon, RefreshCw, X } from "lucide-react";
+import { logActivity } from "../utils/activityLog";
 import "./AddDriver.css"; 
 
 function DocumentAlerts() {
@@ -130,6 +131,13 @@ function DocumentAlerts() {
       // Update the specific field in the database
       await updateDoc(doc(db, collectionName, renewModal.id), {
         [dbField]: renewModal.newDate
+      });
+      await logActivity(db, {
+        action: "document_renewed",
+        module: "compliance",
+        summary: `Renewed ${renewModal.docName} for ${renewModal.type} until ${renewModal.newDate}`,
+        targetId: renewModal.id,
+        targetType: renewModal.type.toLowerCase(),
       });
 
       alert(`${renewModal.docName} renewed successfully!`);

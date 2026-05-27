@@ -4,6 +4,7 @@ import { db } from "../firebase";
 import { collection, addDoc, getDocs } from "firebase/firestore";
 import { TrendingDown, IndianRupee, Wrench, Landmark } from "lucide-react";
 import { getDriverCarryForwardToMonth, getDriverMonthSummary } from "../utils/driverSalary";
+import { logActivity } from "../utils/activityLog";
 import "./AddDriver.css"; 
 
 function AddExpense() {
@@ -110,6 +111,13 @@ function AddExpense() {
         createdAt: new Date().toISOString()
       };
       const docRef = await addDoc(collection(db, "transactions"), payload);
+      await logActivity(db, {
+        action: "expense_created",
+        module: "payments",
+        summary: `Recorded ${form.category} expense Rs ${Number(form.amount).toLocaleString("en-IN")}`,
+        targetId: docRef.id,
+        targetType: "transaction",
+      });
       setTransactions((prev) => [...prev, { id: docRef.id, ...payload }]);
 
       alert(`Expense Recorded! ✅\nVoucher: ${form.voucherNo}`);

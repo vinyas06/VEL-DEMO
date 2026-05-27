@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import Navbar from "../components/Navbar";
 import { db } from "../firebase";
-import { collection, getDocs, orderBy, query, limit } from "firebase/firestore";
+import { collection, limit, onSnapshot, orderBy, query } from "firebase/firestore";
 import { Activity, Clock, User, Shield, Briefcase, FileText, Landmark } from "lucide-react";
 import { ACTIVITY_LOGS_COLLECTION } from "../utils/activityLog";
 
@@ -10,28 +10,24 @@ function ActivityTracker() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const fetchLogs = async () => {
-      try {
-        // Fetch the 100 most recent activities
-        const q = query(collection(db, ACTIVITY_LOGS_COLLECTION), limit(100));
-        const snapshot = await getDocs(q);
-        
+    const q = query(collection(db, ACTIVITY_LOGS_COLLECTION), orderBy("createdAt", "desc"), limit(100));
+    const unsubscribe = onSnapshot(
+      q,
+      (snapshot) => {
         const fetchedLogs = snapshot.docs.map(doc => ({
           id: doc.id,
           ...doc.data()
         }));
-        
-        // Sort newest first
-        fetchedLogs.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
         setLogs(fetchedLogs);
-      } catch (error) {
+        setLoading(false);
+      },
+      (error) => {
         console.error("Error loading activity logs:", error);
-      } finally {
         setLoading(false);
       }
-    };
+    );
 
-    fetchLogs();
+    return unsubscribe;
   }, []);
 
   const getModuleIcon = (module) => {

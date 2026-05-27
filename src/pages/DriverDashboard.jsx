@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { db } from "../firebase";
 import { collection, query, where, getDocs, addDoc, updateDoc, doc, or } from "firebase/firestore";
 import { Truck, MapPin, Navigation, PlusCircle, CheckCircle, LogOut, User, Clock, AlertTriangle, ArrowRightCircle, IndianRupee, X, WalletCards, Calendar } from "lucide-react";
+import { logActivity } from "../utils/activityLog";
 import "./DriverDashboard.css"; 
 
 const formatMoney = (value) =>
@@ -209,6 +210,14 @@ function DriverDashboard() {
         timestamp,
         createdAt: timestamp
       });
+      await logActivity(db, {
+        action: "trip_status_updated",
+        module: "bookings",
+        summary: `${loggedInDriverName} updated trip ${selectedTrip.trackingId || selectedTrip.id} to ${newStatus}`,
+        targetId: selectedTrip.id,
+        targetType: "booking",
+        metadata: { odometer: Number(statusOdo), location: coords },
+      });
 
       alert(`Status updated to: ${newStatus} ✅`);
       setShowStatusModal(false);
@@ -241,6 +250,13 @@ function DriverDashboard() {
         status: "Pending Approval"
       };
       const docRef = await addDoc(collection(db, "driver_submissions"), payload);
+      await logActivity(db, {
+        action: "driver_expense_submitted",
+        module: "driver_expenses",
+        summary: `${loggedInDriverName} submitted ${expenseForm.type} expense Rs ${Number(expenseForm.amount).toLocaleString("en-IN")}`,
+        targetId: docRef.id,
+        targetType: "driver_submission",
+      });
       setDriverSubmissions((prev) => [...prev, { id: docRef.id, ...payload }]);
       if (expenseForm.deductionSource !== "driver_salary") {
         setDriverWallet((prev) => ({

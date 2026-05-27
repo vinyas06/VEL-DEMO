@@ -4,6 +4,7 @@ import Modal from "../components/Modal";
 import { db } from "../firebase";
 import { collection, getDocs, updateDoc, doc } from "firebase/firestore";
 import { Search, User, Phone, FileText, Edit, Eye, ShieldAlert } from "lucide-react";
+import { logActivity } from "../utils/activityLog";
 import "./DriverList.css"; 
 
 const getSalaryTypeLabel = (driver = {}) => {
@@ -82,6 +83,13 @@ function DriverList() {
         updatePayload.commissionRate === "" ? "" : Number(updatePayload.commissionRate) || 0;
 
       await updateDoc(doc(db, "drivers", selected.id), updatePayload);
+      await logActivity(db, {
+        action: "driver_updated",
+        module: "drivers",
+        summary: `Updated driver profile for ${updatePayload.name || selected.name || selected.id}`,
+        targetId: selected.id,
+        targetType: "driver",
+      });
       
       // Update local state instantly so we don't have to refresh
       setDrivers(drivers.map(d => d.id === selected.id ? updatePayload : d));

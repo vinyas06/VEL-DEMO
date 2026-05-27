@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { collection, getDocs, updateDoc, doc } from "firebase/firestore";
+import { collection, doc, getDocs, limit, onSnapshot, orderBy, query, updateDoc } from "firebase/firestore";
 import { CheckCircle2, Clock3, ShieldCheck, XCircle } from "lucide-react";
 import Navbar from "../components/Navbar";
 import { db } from "../firebase";
@@ -17,21 +17,13 @@ function UserApprovals() {
   const fetchUsers = async () => {
     setLoading(true);
     try {
-      const [userSnapshot, activitySnapshot] = await Promise.all([
-        getDocs(collection(db, PORTAL_USERS_COLLECTION)),
-        getDocs(collection(db, ACTIVITY_LOGS_COLLECTION)),
-      ]);
+      const userSnapshot = await getDocs(collection(db, PORTAL_USERS_COLLECTION));
 
       const data = userSnapshot.docs
         .map((item) => ({ id: item.id, ...item.data() }))
         .sort((a, b) => new Date(b.updatedAt || b.createdAt || 0) - new Date(a.updatedAt || a.createdAt || 0));
 
-      const activityData = activitySnapshot.docs
-        .map((item) => ({ id: item.id, ...item.data() }))
-        .sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
-
       setUsers(data);
-      setActivities(activityData);
     } catch (error) {
       console.error("Error fetching portal users:", error);
     } finally {
@@ -41,6 +33,17 @@ function UserApprovals() {
 
   useEffect(() => {
     fetchUsers();
+  }, []);
+
+  useEffect(() => {
+    const activityQuery = query(
+      collection(db, ACTIVITY_LOGS_COLLECTION),
+      orderBy("createdAt", "desc"),
+      limit(100)
+    );
+    return onSnapshot(activityQuery, (snapshot) => {
+      setActivities(snapshot.docs.map((item) => ({ id: item.id, ...item.data() })));
+    });
   }, []);
 
   const handleStatusChange = async (user, status) => {

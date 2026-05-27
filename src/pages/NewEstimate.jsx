@@ -4,6 +4,7 @@ import Navbar from "../components/Navbar";
 import { db } from "../firebase";
 import { collection, addDoc, getDocs } from "firebase/firestore"; 
 import { Calculator, MapPin, Navigation, Box, FileText, Truck, Users } from "lucide-react"; 
+import { logActivity } from "../utils/activityLog";
 import "./AddDriver.css"; // Reuse your excellent CSS
 
 const API_KEY = "278f06ea43474a83be95b023b58a1a39"; 
@@ -113,10 +114,17 @@ function NewEstimate() {
     if (!form.party || !form.from || !form.to) return alert("❌ Please fill Party, From, and To.");
     setIsSubmitting(true);
     try {
-      await addDoc(collection(db, "estimates"), {
+      const docRef = await addDoc(collection(db, "estimates"), {
         ...form,
         createdAt: new Date().toISOString(),
         status: "Quoted" // Initial status
+      });
+      await logActivity(db, {
+        action: "estimate_created",
+        module: "estimates",
+        summary: `Created estimate ${form.estimateId} for ${form.party}`,
+        targetId: docRef.id,
+        targetType: "estimate",
       });
       alert(`Estimate Saved! ✅\nID: ${form.estimateId}`);
       navigate("/estimate-list"); 

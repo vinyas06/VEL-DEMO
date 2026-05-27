@@ -5,6 +5,7 @@ import { db } from "../firebase";
 import { collection, getDocs, deleteDoc, doc } from "firebase/firestore";
 import { Search, MapPin, Package, User, Trash2, Calendar, FileText, ArrowRightCircle } from "lucide-react"; 
 import { getCurrentMonthValue, getRecordDateInput } from "../utils/dateRange";
+import { logActivity } from "../utils/activityLog";
 import "./BookingList.css"; // Reuse your exact CSS
 
 function EstimateList() {
@@ -32,7 +33,15 @@ function EstimateList() {
   const handleDelete = async (id) => {
     if (!window.confirm("Delete this estimate?")) return;
     try {
+      const estimate = estimates.find(e => e.id === id);
       await deleteDoc(doc(db, "estimates", id));
+      await logActivity(db, {
+        action: "estimate_deleted",
+        module: "estimates",
+        summary: `Deleted estimate ${estimate?.estimateId || id}${estimate?.party ? ` for ${estimate.party}` : ""}`,
+        targetId: id,
+        targetType: "estimate",
+      });
       setEstimates(estimates.filter(e => e.id !== id));
     } catch { alert("Error deleting."); }
   };

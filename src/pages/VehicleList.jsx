@@ -4,6 +4,7 @@ import Modal from "../components/Modal";
 import { db } from "../firebase";
 import { collection, getDocs, updateDoc, doc } from "firebase/firestore";
 import { Search, Truck, Eye, Edit, ShieldAlert, Wrench, User, FileCheck } from "lucide-react";
+import { logActivity } from "../utils/activityLog";
 import "./VehicleList.css";
 
 function VehicleList() {
@@ -54,6 +55,13 @@ function VehicleList() {
       const updatedData = { ...selected, number: selected.number.toUpperCase() };
       
       await updateDoc(doc(db, "vehicles", selected.id), updatedData);
+      await logActivity(db, {
+        action: "vehicle_updated",
+        module: "vehicles",
+        summary: `Updated vehicle ${updatedData.number || selected.id}`,
+        targetId: selected.id,
+        targetType: "vehicle",
+      });
       
       // Update UI instantly
       setVehicles(vehicles.map(v => v.id === selected.id ? updatedData : v));

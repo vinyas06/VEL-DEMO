@@ -3,6 +3,7 @@ import Navbar from "../components/Navbar";
 import { db } from "../firebase";
 import { collection, addDoc, getDocs } from "firebase/firestore";
 import { ArrowLeftRight, IndianRupee, Landmark, ReceiptText } from "lucide-react";
+import { logActivity } from "../utils/activityLog";
 import "./AddDriver.css";
 
 const buildTransferVoucher = () => `TRF-${Math.floor(10000 + Math.random() * 90000)}`;
@@ -66,7 +67,7 @@ function SelfTransfer() {
 
     setIsSubmitting(true);
     try {
-      await Promise.all([
+      const [outRef, inRef] = await Promise.all([
         addDoc(collection(db, "transactions"), {
           ...commonFields,
           type: "TRANSFER_OUT",
@@ -82,6 +83,14 @@ function SelfTransfer() {
           partyName: form.fromAccount,
         }),
       ]);
+      await logActivity(db, {
+        action: "self_transfer_created",
+        module: "payments",
+        summary: `Transferred Rs ${amount.toLocaleString("en-IN")} from ${form.fromAccount} to ${form.toAccount}`,
+        targetId: transferId,
+        targetType: "transfer",
+        metadata: { outTransactionId: outRef.id, inTransactionId: inRef.id },
+      });
 
       alert(`Self transfer recorded.\nVoucher: ${form.voucherNo}`);
       setForm({

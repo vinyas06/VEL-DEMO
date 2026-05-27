@@ -6,6 +6,7 @@ import { ArrowDownLeft, ArrowUpRight, Wallet, Printer, Download, Calendar, Edit,
 import { fetchCompanyProfile } from "../utils/companyProfile";
 import { getCurrentMonthValue, getRecordDateInput } from "../utils/dateRange";
 import { isMoneyInTransaction } from "../utils/finance";
+import { logActivity } from "../utils/activityLog";
 import "./BookingList.css"; 
 
 const getValidTime = (value) => {
@@ -185,6 +186,13 @@ function TransactionList() {
       };
 
       await updateDoc(doc(db, "transactions", editModal.transactionId), payload);
+      await logActivity(db, {
+        action: "transaction_updated",
+        module: "payments",
+        summary: `Updated transaction ${editModal.form.voucherNo || editModal.transactionId} for Rs ${amount.toLocaleString("en-IN")}`,
+        targetId: editModal.transactionId,
+        targetType: "transaction",
+      });
       setTransactions((prev) =>
         prev.map((transaction) =>
           transaction.id === editModal.transactionId

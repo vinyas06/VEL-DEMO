@@ -164,7 +164,7 @@ function NewBooking() {
     try {
       const timestamp = new Date().toISOString();
 
-      await addDoc(collection(db, "bookings"), {
+      const bookingRef = await addDoc(collection(db, "bookings"), {
         trackingId: form.trackingId, 
         lrNumber: form.lrNumber || "N/A", 
         party: form.party,
@@ -192,8 +192,9 @@ function NewBooking() {
         action: "booking_created",
         module: "bookings",
         summary: `created booking ${form.trackingId} for ${form.party}`,
-        targetId: form.trackingId,
+        targetId: bookingRef.id,
         targetType: "booking",
+        metadata: { trackingId: form.trackingId },
       });
 
       const selectedParty = parties.find(p => p.name === form.party);
@@ -245,6 +246,14 @@ function NewBooking() {
 
       if (estimateData?.id) {
         await updateDoc(doc(db, "estimates", estimateData.id), { status: "Converted to Booking" });
+        await logActivity(db, {
+          action: "estimate_converted",
+          module: "estimates",
+          summary: `Converted estimate ${estimateData.estimateId || estimateData.id} to booking ${form.trackingId}`,
+          targetId: estimateData.id,
+          targetType: "estimate",
+          metadata: { bookingId: bookingRef.id, trackingId: form.trackingId },
+        });
       }
 
       alert(`Booking Saved Successfully! ✅\nTracking ID: ${form.trackingId}`);

@@ -3,6 +3,7 @@ import Navbar from "../components/Navbar";
 import { db } from "../firebase";
 import { collection, addDoc } from "firebase/firestore";
 import { UserPlus, ShieldCheck, HeartPulse, FileText, IndianRupee } from "lucide-react";
+import { logActivity } from "../utils/activityLog";
 import "./AddDriver.css";
 
 const buildInitialForm = () => ({
@@ -43,11 +44,18 @@ function AddDriver() {
     setIsSubmitting(true);
 
     try {
-      await addDoc(collection(db, "drivers"), {
+      const docRef = await addDoc(collection(db, "drivers"), {
         ...form,
         salary: Number(form.salary) || 0,
         commissionRate: Number(form.commissionRate) || 0,
         createdAt: new Date().toISOString(),
+      });
+      await logActivity(db, {
+        action: "driver_created",
+        module: "drivers",
+        summary: `Created driver profile for ${form.name}`,
+        targetId: docRef.id,
+        targetType: "driver",
       });
 
       alert("Driver Profile Created Successfully.");

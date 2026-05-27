@@ -3,6 +3,7 @@ import Navbar from "../components/Navbar";
 import { db } from "../firebase";
 import { collection, addDoc } from "firebase/firestore";
 import { Wallet, Building, IndianRupee } from "lucide-react";
+import { logActivity } from "../utils/activityLog";
 import "./AddDriver.css"; // Safely reusing your premium CSS
 
 function AddAccount() {
@@ -24,11 +25,18 @@ function AddAccount() {
 
     setIsSubmitting(true);
     try {
-      await addDoc(collection(db, "accounts"), {
+      const docRef = await addDoc(collection(db, "accounts"), {
         ...form,
         openingBalance: Number(form.openingBalance),
         currentBalance: Number(form.openingBalance), // Initial balance
         createdAt: new Date().toISOString()
+      });
+      await logActivity(db, {
+        action: "account_created",
+        module: "accounts",
+        summary: `Created account ${form.accountName} with opening balance Rs ${Number(form.openingBalance).toLocaleString("en-IN")}`,
+        targetId: docRef.id,
+        targetType: "account",
       });
 
       alert("Account Created Successfully! ✅");

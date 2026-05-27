@@ -3,6 +3,7 @@ import Navbar from "../components/Navbar";
 import { db } from "../firebase";
 import { collection, addDoc } from "firebase/firestore";
 import { Users, Contact, FileText, IndianRupee } from "lucide-react";
+import { logActivity } from "../utils/activityLog";
 import "./AddParty.css"; 
 
 function AddCommissionAgent() {
@@ -29,11 +30,18 @@ function AddCommissionAgent() {
     setIsSubmitting(true);
     try {
       // 🔥 SAVES TO "agents" COLLECTION
-      await addDoc(collection(db, "agents"), {
+      const docRef = await addDoc(collection(db, "agents"), {
         ...form,
         commissionRate: Number(form.commissionRate) || 0,
         balance: Number(form.balance) || 0,
         createdAt: new Date().toISOString(),
+      });
+      await logActivity(db, {
+        action: "agent_created",
+        module: "agents",
+        summary: `Registered commission agent ${form.name}`,
+        targetId: docRef.id,
+        targetType: "agent",
       });
 
       alert("Commission Agent Registered Successfully! ✅");

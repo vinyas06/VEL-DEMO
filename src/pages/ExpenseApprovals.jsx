@@ -4,6 +4,7 @@ import { db } from "../firebase";
 import { collection, getDocs, deleteDoc, doc, addDoc } from "firebase/firestore";
 import { CheckCircle, XCircle, Clock, IndianRupee, User, Truck, Calendar } from "lucide-react";
 import { getCurrentMonthValue, getRecordDateInput } from "../utils/dateRange";
+import { logActivity } from "../utils/activityLog";
 import "./BookingList.css";
 
 function ExpenseApprovals() {
@@ -51,7 +52,7 @@ function ExpenseApprovals() {
       : submission.vehicleNumber || "Driver Expense";
 
     try {
-      await addDoc(collection(db, "transactions"), {
+      const transactionRef = await addDoc(collection(db, "transactions"), {
         voucherNo: `APP-${Math.floor(10000 + Math.random() * 90000)}`,
         date: submission.date,
         category: submission.category,
@@ -73,6 +74,14 @@ function ExpenseApprovals() {
       });
 
       await deleteDoc(doc(db, "driver_submissions", submission.id));
+      await logActivity(db, {
+        action: "driver_expense_approved",
+        module: "driver_expenses",
+        summary: `Approved ${submission.category} expense Rs ${Number(submission.amount).toLocaleString("en-IN")} for ${submission.driverName}`,
+        targetId: submission.id,
+        targetType: "driver_submission",
+        metadata: { transactionId: transactionRef.id },
+      });
 
       alert("Expense Approved & Ledger Updated!");
       fetchData();
@@ -87,7 +96,15 @@ function ExpenseApprovals() {
       return;
     }
 
+    const submission = submissions.find((item) => item.id === id);
     await deleteDoc(doc(db, "driver_submissions", id));
+    await logActivity(db, {
+      action: "driver_expense_rejected",
+      module: "driver_expenses",
+      summary: `Rejected ${submission?.category || "driver"} expense${submission?.driverName ? ` for ${submission.driverName}` : ""}`,
+      targetId: id,
+      targetType: "driver_submission",
+    });
     fetchData();
   };
 

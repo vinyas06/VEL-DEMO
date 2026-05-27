@@ -3,6 +3,7 @@ import Navbar from "../components/Navbar";
 import { db } from "../firebase";
 import { collection, addDoc } from "firebase/firestore";
 import { Building2, Contact, CreditCard, FileText } from "lucide-react";
+import { logActivity } from "../utils/activityLog";
 import "./AddParty.css"; 
 
 function AddParty() {
@@ -32,11 +33,18 @@ function AddParty() {
 
     try {
       // 🔥 Always saves to 'parties'
-      await addDoc(collection(db, "parties"), {
+      const docRef = await addDoc(collection(db, "parties"), {
         ...form,
         balance: Number(form.balance) || 0, 
         creditLimit: Number(form.creditLimit) || 0,
         createdAt: new Date().toISOString(),
+      });
+      await logActivity(db, {
+        action: "party_created",
+        module: "parties",
+        summary: `Registered party ${form.name}`,
+        targetId: docRef.id,
+        targetType: "party",
       });
 
       alert("Party Added Successfully! ✅");

@@ -3,6 +3,7 @@ import Navbar from "../components/Navbar";
 import { db } from "../firebase";
 import { collection, addDoc, getDocs } from "firebase/firestore";
 import { HandCoins, IndianRupee, Landmark, UserRound, WalletCards } from "lucide-react";
+import { logActivity } from "../utils/activityLog";
 import "./AddDriver.css";
 
 const buildAdvanceVoucher = () => `DRV-ADV-${Math.floor(10000 + Math.random() * 90000)}`;
@@ -139,6 +140,13 @@ function DriverAdvances() {
     setIsSubmitting(true);
     try {
       const docRef = await addDoc(collection(db, "transactions"), payload);
+      await logActivity(db, {
+        action: "driver_advance_created",
+        module: "payments",
+        summary: `Recorded driver advance Rs ${amount.toLocaleString("en-IN")} for ${form.driverName}`,
+        targetId: docRef.id,
+        targetType: "transaction",
+      });
       setTransactions((prev) => [...prev, { id: docRef.id, ...payload }]);
       alert(`Driver advance recorded.\nVoucher: ${form.voucherNo}`);
       setForm({

@@ -3,6 +3,7 @@ import Navbar from "../components/Navbar";
 import { db } from "../firebase";
 import { collection, addDoc, getDocs } from "firebase/firestore";
 import { Truck, FileCheck, Wrench, ShieldAlert } from "lucide-react";
+import { logActivity } from "../utils/activityLog";
 import "./AddVehicle.css"; // 🔥 Your new premium CSS
 
 function AddVehicle() {
@@ -53,10 +54,17 @@ function AddVehicle() {
     setIsSubmitting(true);
 
     try {
-      await addDoc(collection(db, "vehicles"), {
+      const docRef = await addDoc(collection(db, "vehicles"), {
         ...form,
         number: form.number.toUpperCase(), // Standardize vehicle plates
         createdAt: new Date().toISOString(),
+      });
+      await logActivity(db, {
+        action: "vehicle_created",
+        module: "vehicles",
+        summary: `Registered vehicle ${form.number.toUpperCase()}`,
+        targetId: docRef.id,
+        targetType: "vehicle",
       });
 
       alert("Vehicle Added Successfully! ✅");

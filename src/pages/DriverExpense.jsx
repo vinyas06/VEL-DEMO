@@ -4,6 +4,7 @@ import Navbar from "../components/Navbar";
 import { db } from "../firebase";
 import { collection, addDoc, getDocs, query, where, or } from "firebase/firestore";
 import { Send, ClipboardList, Link2, Truck, WalletCards, ArrowLeft } from "lucide-react";
+import { logActivity } from "../utils/activityLog";
 import "./AddDriver.css";
 
 const getDriverName = (record = {}) => record.driverName || record.payeeName || record.payee || "";
@@ -121,6 +122,13 @@ function DriverExpense() {
         createdAt: new Date().toISOString(),
       };
       const docRef = await addDoc(collection(db, "driver_submissions"), payload);
+      await logActivity(db, {
+        action: "driver_expense_submitted",
+        module: "driver_expenses",
+        summary: `${user?.name || "Driver"} submitted ${form.category} expense Rs ${Number(form.amount).toLocaleString("en-IN")}`,
+        targetId: docRef.id,
+        targetType: "driver_submission",
+      });
       const updatedSubmissions = [...submissions, { id: docRef.id, ...payload }];
       setSubmissions(updatedSubmissions);
       if (form.deductionSource !== "driver_salary") {
