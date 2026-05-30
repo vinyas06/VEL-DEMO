@@ -8,6 +8,16 @@ import { logActivity } from "../utils/activityLog";
 import "./AddDriver.css";
 
 const getDriverName = (record = {}) => record.driverName || record.payeeName || record.payee || "";
+const DRIVER_TRIP_EXPENSE_CATEGORIES = [
+  "Petrol",
+  "Fastag",
+  "Hamali/Labour Loading Unloading",
+  "Police Fine",
+  "Check Post Police Tips",
+  "Trip Allowance",
+  "AdBlue",
+];
+
 const toNumber = (value) => {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : 0;
@@ -53,7 +63,7 @@ function DriverExpense() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [form, setForm] = useState({
     date: new Date().toISOString().split("T")[0],
-    category: "Fuel",
+    category: "Petrol",
     bookingId: "",
     trackingId: "",
     vehicleNumber: "",
@@ -110,6 +120,9 @@ function DriverExpense() {
     if (!form.amount) {
       return alert("Please enter Amount.");
     }
+    if (!form.bookingId) {
+      return alert("Please select the trip for this expense.");
+    }
 
     setIsSubmitting(true);
     try {
@@ -142,7 +155,7 @@ function DriverExpense() {
       alert("Expense sent for Admin Approval!");
       setForm({
         date: new Date().toISOString().split("T")[0],
-        category: "Fuel",
+        category: "Petrol",
         bookingId: "",
         trackingId: "",
         vehicleNumber: "",
@@ -166,8 +179,8 @@ function DriverExpense() {
           <div className="header-title">
             <ClipboardList size={28} className="text-blue" />
             <div>
-              <h2>Submit Trip Expense</h2>
-              <p>Send Fuel, Toll, or Batta bills to Admin for approval.</p>
+                <h2>Submit Trip Expense</h2>
+                <p>Send trip-related expenses to Admin for approval.</p>
             </div>
           </div>
           <button
@@ -223,17 +236,16 @@ function DriverExpense() {
               value={form.category}
               onChange={(event) => setForm({ ...form, category: event.target.value })}
             >
-              <option value="Fuel">Fuel / Diesel</option>
-              <option value="Toll">Toll / Fastag</option>
-              <option value="Driver Batta">Driver Batta</option>
-              <option value="Repair">Emergency Repair</option>
+                {DRIVER_TRIP_EXPENSE_CATEGORIES.map((category) => (
+                  <option key={category} value={category}>{category}</option>
+                ))}
             </select>
           </div>
 
           <div className="input-group">
             <label>
               <Link2 size={14} style={{ display: "inline", marginRight: "5px" }} />
-              Linked Trip (Optional)
+              Linked Trip *
             </label>
             <select value={form.bookingId} onChange={handleTripChange}>
               <option value="">-- Select Trip --</option>
@@ -246,7 +258,7 @@ function DriverExpense() {
           </div>
 
           <div className="input-group">
-            <label>Vehicle Number (Optional)</label>
+            <label>Vehicle Number</label>
             <input
               placeholder="e.g. KA19 AB 1234"
               value={form.vehicleNumber}

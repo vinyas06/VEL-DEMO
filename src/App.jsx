@@ -44,6 +44,7 @@ import TripwisePayments from "./pages/TripwisePayments";
 import PaymentIn from "./pages/PaymentIn";
 import PaymentOut from "./pages/PaymentOut";
 import AddExpense from "./pages/AddExpense";
+import Loans from "./pages/Loans";
 import DriverSalaryLedger from "./pages/DriverSalaryLedger";
 import DriverAdvances from "./pages/DriverAdvances";
 import SelfTransfer from "./pages/SelfTransfer";
@@ -228,6 +229,7 @@ function App() {
           <Route path="/payment-in" element={<ProtectedAdmin><PaymentIn /></ProtectedAdmin>} />
           <Route path="/payment-out" element={<ProtectedAdmin><PaymentOut /></ProtectedAdmin>} />
           <Route path="/add-expense" element={<ProtectedAdmin><AddExpense /></ProtectedAdmin>} />
+          <Route path="/loans" element={<ProtectedAdmin><Loans /></ProtectedAdmin>} />
           <Route path="/driver-salary-ledger" element={<ProtectedAdmin><DriverSalaryLedger /></ProtectedAdmin>} />
           <Route path="/driver-advances" element={<ProtectedAdmin><DriverAdvances /></ProtectedAdmin>} />
           <Route path="/self-transfer" element={<ProtectedAdmin><SelfTransfer /></ProtectedAdmin>} />

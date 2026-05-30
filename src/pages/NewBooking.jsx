@@ -11,6 +11,25 @@ import "./AddDriver.css";
 const API_KEY = "278f06ea43474a83be95b023b58a1a39"; 
 const generate6DigitId = () => Math.floor(100000 + Math.random() * 900000).toString();
 const sanitizeDecimalInput = (value) => value.replace(/[^\d.]/g, "").replace(/(\..*)\./g, "$1");
+const getNextLrNumber = (bookings = []) => {
+  const numericLrs = bookings
+    .map((booking) => String(booking.lrNumber || "").trim())
+    .filter((lrNumber) => /^\d+$/.test(lrNumber));
+
+  if (numericLrs.length === 0) {
+    return "001";
+  }
+
+  const latest = numericLrs.reduce(
+    (best, lrNumber) => {
+      const value = Number(lrNumber);
+      return value > best.value ? { value, width: lrNumber.length } : best;
+    },
+    { value: 0, width: 3 }
+  );
+
+  return String(latest.value + 1).padStart(latest.width, "0");
+};
 
 const decimalInputProps = {
   type: "text",
@@ -67,6 +86,7 @@ function NewBooking() {
         const dSnap = await getDocs(collection(db, "drivers"));
         const aSnap = await getDocs(collection(db, "agents")); 
         const accSnap = await getDocs(collection(db, "accounts")); 
+        const bookingSnap = await getDocs(collection(db, "bookings"));
 
         setParties(pSnap.docs.map(d => ({ 
           id: d.id, 
@@ -78,6 +98,10 @@ function NewBooking() {
         setDrivers(dSnap.docs.map(d => d.data().name));
         setAgents(aSnap.docs.map(d => ({ id: d.id, name: d.data().name, rate: d.data().commissionRate || 0 })));
         setAccounts(accSnap.docs.map(d => ({ id: d.id, ...d.data() })));
+        setForm((prev) => ({
+          ...prev,
+          lrNumber: prev.lrNumber || getNextLrNumber(bookingSnap.docs.map(d => d.data())),
+        }));
       } catch (error) {
         console.error("Error fetching data:", error);
       }
@@ -221,6 +245,9 @@ function NewBooking() {
           voucherNo: `ADV-${form.trackingId}`,
           date: form.loadingDate,
           partyName: form.party,
+          bookingId: bookingRef.id,
+          bookingTrackingId: form.trackingId,
+          bookingLrNumber: form.lrNumber,
           amount: Number(form.advance),
           paymentAccount: form.advanceAccount,
           referenceNo: `LR: ${form.lrNumber || form.trackingId}`,
@@ -235,6 +262,9 @@ function NewBooking() {
           voucherNo: `COM-${form.trackingId}`,
           date: form.loadingDate,
           payeeName: form.agent,
+          bookingId: bookingRef.id,
+          bookingTrackingId: form.trackingId,
+          bookingLrNumber: form.lrNumber,
           amount: Number(form.commission),
           paymentAccount: form.commissionAccount,
           referenceNo: `LR: ${form.lrNumber || form.trackingId}`,

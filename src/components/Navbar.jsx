@@ -69,6 +69,7 @@ const getAdminSections = (user) => [
       { to: "/driver-advances", label: "Driver Advances", icon: Wallet },
       { to: "/driver-salary-ledger", label: "Driver Salary Ledger", icon: ReceiptIndianRupee },
       { to: "/add-expense", label: "Add Expense", icon: Wallet },
+      { to: "/loans", label: "Loans", icon: Landmark },
       { to: "/approve-expenses", label: "Approve Expenses", icon: ClipboardList },
       { to: "/consolidated-bill", label: "Consolidated Bill", icon: FileText },
       { to: "/add-account", label: "Add Account", icon: Landmark },

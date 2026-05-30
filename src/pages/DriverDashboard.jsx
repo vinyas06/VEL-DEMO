@@ -15,6 +15,16 @@ const getPayPlanLabel = (salaryType) => {
   return "Fixed Salary";
 };
 
+const DRIVER_TRIP_EXPENSE_CATEGORIES = [
+  "Petrol",
+  "Fastag",
+  "Hamali/Labour Loading Unloading",
+  "Police Fine",
+  "Check Post Police Tips",
+  "Trip Allowance",
+  "AdBlue",
+];
+
 const getDriverTransactionName = (record = {}) =>
   record.driverName || record.payeeName || record.payee || "";
 
@@ -88,7 +98,7 @@ function DriverDashboard() {
   const [selectedTrip, setSelectedTrip] = useState(null);
   const [statusOdo, setStatusOdo] = useState("");
   
-  const [expenseForm, setExpenseForm] = useState({ type: "Fuel", amount: "", description: "", deductionSource: "admin_account" });
+  const [expenseForm, setExpenseForm] = useState({ type: "Petrol", amount: "", description: "", deductionSource: "admin_account" });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submittingStatus, setSubmittingStatus] = useState(null); 
 
@@ -267,7 +277,7 @@ function DriverDashboard() {
       }
       alert("Expense submitted to Admin! ✅");
       setShowExpenseModal(false);
-      setExpenseForm({ type: "Fuel", amount: "", description: "", deductionSource: "admin_account" });
+      setExpenseForm({ type: "Petrol", amount: "", description: "", deductionSource: "admin_account" });
     } catch {
       alert("Error submitting expense.");
     } finally {
@@ -630,11 +640,9 @@ function DriverDashboard() {
               <div>
                 <label style={{ display: "block", marginBottom: "5px", fontWeight: "bold", color: "#334155" }}>Expense Type</label>
                 <select style={{ width: "100%", padding: "10px", borderRadius: "6px", border: "1px solid #cbd5e1" }} value={expenseForm.type} onChange={(e) => setExpenseForm({...expenseForm, type: e.target.value})}>
-                  <option value="Fuel">Diesel / Fuel</option>
-                  <option value="Toll">Toll Tax</option>
-                  <option value="Unloading">Unloading Charges</option>
-                  <option value="Police/RTO">Police / RTO / Challan</option>
-                  <option value="Other">Other Emergency</option>
+                  {DRIVER_TRIP_EXPENSE_CATEGORIES.map((category) => (
+                    <option key={category} value={category}>{category}</option>
+                  ))}
                 </select>
               </div>
 

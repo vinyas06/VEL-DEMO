@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
 import Navbar from "../components/Navbar";
 import { db } from "../firebase";
-import { collection, doc, getDocs, updateDoc } from "firebase/firestore";
-import { ArrowDownLeft, ArrowUpRight, Wallet, Printer, Download, Calendar, Edit, Save, X } from "lucide-react";
+import { collection, deleteDoc, doc, getDocs, updateDoc } from "firebase/firestore";
+import { ArrowDownLeft, ArrowUpRight, Wallet, Printer, Download, Calendar, Edit, Save, Trash2, X } from "lucide-react";
 import { fetchCompanyProfile } from "../utils/companyProfile";
 import { getCurrentMonthValue, getRecordDateInput } from "../utils/dateRange";
 import { isMoneyInTransaction } from "../utils/finance";
@@ -210,6 +210,27 @@ function TransactionList() {
     }
   };
 
+  const handleDeleteTransaction = async (transaction) => {
+    if (!window.confirm(`Delete transaction ${transaction.voucherNo || transaction.id}? This cannot be undone.`)) {
+      return;
+    }
+
+    try {
+      await deleteDoc(doc(db, "transactions", transaction.id));
+      await logActivity(db, {
+        action: "transaction_deleted",
+        module: "payments",
+        summary: `Deleted transaction ${transaction.voucherNo || transaction.id} for Rs ${Number(transaction.amount || 0).toLocaleString("en-IN")}`,
+        targetId: transaction.id,
+        targetType: "transaction",
+      });
+      setTransactions((prev) => prev.filter((item) => item.id !== transaction.id));
+    } catch (error) {
+      console.error("Error deleting transaction:", error);
+      alert("Error deleting transaction.");
+    }
+  };
+
   return (
     <div className="list-page-bg">
       <Navbar />
@@ -338,6 +359,23 @@ function TransactionList() {
                             }}
                           >
                             <Edit size={14} /> Edit
+                          </button>
+                          <button
+                            onClick={() => handleDeleteTransaction(trx)}
+                            style={{
+                              background: "#ef4444",
+                              color: "white",
+                              border: "none",
+                              padding: "6px 10px",
+                              borderRadius: "6px",
+                              cursor: "pointer",
+                              display: "flex",
+                              alignItems: "center",
+                              gap: "4px",
+                              fontSize: "0.8rem"
+                            }}
+                          >
+                            <Trash2 size={14} /> Delete
                           </button>
                         </div>
                       </td>

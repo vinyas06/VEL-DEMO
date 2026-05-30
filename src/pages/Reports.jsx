@@ -17,6 +17,7 @@ const REPORT_CATEGORIES = [
       { id: "pay_in", name: "Payment In (Receipts)" },
       { id: "pay_out", name: "Payment Out (Debits)" },
       { id: "expenses", name: "Expense Register" },
+      { id: "trip_profit_loss", name: "Trip Profit & Loss" },
     ]
   },
   {
@@ -49,6 +50,44 @@ const getTimestamp = (record = {}) => {
 
 const getTransactionName = (t = {}) => t.partyName || t.payeeName || t.targetName || t.payee || t.party || "General";
 const getTransactionAccount = (t = {}) => t.paymentAccount || t.paymentMode || t.accountName || "-";
+const normalizeKey = (value) => String(value || "").trim().toLowerCase();
+const toNumber = (value) => {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : 0;
+};
+const getBookingKeys = (booking = {}) =>
+  [booking.id, booking.trackingId, booking.lrNumber].filter(Boolean).map(normalizeKey);
+const getTransactionBookingKeys = (transaction = {}) =>
+  [
+    transaction.bookingId,
+    transaction.linkedBookingId,
+    transaction.bookingTrackingId,
+    transaction.trackingId,
+    transaction.tripId,
+    transaction.bookingLrNumber,
+    transaction.lrNumber,
+  ]
+    .filter(Boolean)
+    .map(normalizeKey);
+const transactionMatchesBooking = (transaction, booking) => {
+  const bookingKeys = new Set(getBookingKeys(booking));
+  const transactionKeys = getTransactionBookingKeys(transaction);
+
+  if (transactionKeys.some((key) => bookingKeys.has(key))) {
+    return true;
+  }
+
+  const voucherNo = normalizeKey(transaction.voucherNo);
+  const referenceNo = normalizeKey(transaction.referenceNo);
+  const notes = normalizeKey(transaction.notes);
+  const trackingId = normalizeKey(booking.trackingId);
+  const lrNumber = normalizeKey(booking.lrNumber);
+
+  return (
+    (trackingId && (voucherNo.includes(trackingId) || referenceNo.includes(trackingId) || notes.includes(trackingId))) ||
+    (lrNumber && (referenceNo.includes(lrNumber) || notes.includes(lrNumber)))
+  );
+};
 const csvEscape = (value) => {
   const text = String(value ?? "");
   if (text.includes(",") || text.includes('"') || text.includes("\n")) return `"${text.replace(/"/g, '""')}"`;
@@ -119,6 +158,46 @@ function Reports() {
   const payIn = filteredTransactions.filter(t => t.type === "IN");
   const payOut = filteredTransactions.filter(t => t.type === "OUT" && t.category !== "Expense");
   const expenses = filteredTransactions.filter(t => t.type === "EXPENSE" || t.category === "Expense");
+  const tripProfitLoss = filteredBookings.map((booking) => {
+    const tripTransactions = transactions.filter((transaction) => transactionMatchesBooking(transaction, booking));
+    const payInTotal = tripTransactions
+      .filter((transaction) => transaction.type === "IN")
+      .reduce((sum, transaction) => sum + toNumber(transaction.amount), 0);
+    const payOutTotal = tripTransactions
+      .filter((transaction) => transaction.type === "OUT")
+      .reduce((sum, transaction) => sum + toNumber(transaction.amount), 0);
+    const expenseTotal = tripTransactions
+      .filter((transaction) => transaction.type === "EXPENSE" || transaction.category === "Expense")
+      .reduce((sum, transaction) => sum + toNumber(transaction.amount), 0);
+    const advanceFallback =
+      payInTotal === 0 && toNumber(booking.advance) > 0 ? toNumber(booking.advance) : 0;
+    const commissionFallback =
+      !tripTransactions.some((transaction) => transaction.category === "Commission Agent") && toNumber(booking.commission) > 0
+        ? toNumber(booking.commission)
+        : 0;
+    const totalIn = payInTotal + advanceFallback;
+    const totalOut = payOutTotal + commissionFallback;
+
+    return {
+      ...booking,
+      payInTotal: totalIn,
+      payOutTotal: totalOut,
+      expenseTotal,
+      totalCost: totalOut + expenseTotal,
+      profit: totalIn - totalOut - expenseTotal,
+      transactionCount: tripTransactions.length,
+    };
+  });
+  const tripProfitTotals = tripProfitLoss.reduce(
+    (summary, trip) => ({
+      freight: summary.freight + toNumber(trip.freight),
+      payIn: summary.payIn + trip.payInTotal,
+      payOut: summary.payOut + trip.payOutTotal,
+      expense: summary.expense + trip.expenseTotal,
+      profit: summary.profit + trip.profit,
+    }),
+    { freight: 0, payIn: 0, payOut: 0, expense: 0, profit: 0 }
+  );
 
   // Ledger Generators
   const partyLedger = Array.from(new Set(filteredTransactions.map(getTransactionName))).map(party => {
@@ -143,6 +222,11 @@ function Reports() {
       headers = ["Date", "Tracking ID", "LR No", "Party", "Vehicle", "From", "To", "Freight", "Advance", "Status"];
       dataToExport = filteredBookings;
       rows = dataToExport.map(b => [b.loadingDate || b.createdAt || "", b.trackingId || "", b.lrNumber || "", b.party || "", b.vehicle || "", b.from || "", b.to || "", Number(b.freight) || 0, Number(b.advance) || 0, b.status || ""]);
+    }
+    else if (selectedReport.id === "trip_profit_loss") {
+      headers = ["Date", "Tracking ID", "LR No", "Party", "Vehicle", "Freight", "Pay In", "Pay Out", "Expense", "Profit/Loss"];
+      dataToExport = tripProfitLoss;
+      rows = dataToExport.map(b => [b.loadingDate || b.createdAt || "", b.trackingId || "", b.lrNumber || "", b.party || "", b.vehicle || "", Number(b.freight) || 0, b.payInTotal, b.payOutTotal, b.expenseTotal, b.profit]);
     }
     else if (selectedReport.id === "estimates") {
       headers = ["Date", "Estimate ID", "Party", "From", "To", "Material", "Freight Status"];
@@ -173,6 +257,7 @@ function Reports() {
     if (selectedReport.id === "pay_in") activeDataLength = payIn.length;
     else if (selectedReport.id === "pay_out") activeDataLength = payOut.length;
     else if (selectedReport.id === "expenses") activeDataLength = expenses.length;
+    else if (selectedReport.id === "trip_profit_loss") activeDataLength = tripProfitLoss.length;
     else if (selectedReport.id === "all_bookings") activeDataLength = filteredBookings.length;
     else if (selectedReport.id === "estimates") activeDataLength = filteredEstimates.length;
     else if (selectedReport.id === "party_ledger" || selectedReport.id === "agent_commission") activeDataLength = partyLedger.length;
@@ -237,6 +322,9 @@ function Reports() {
                         {["pay_in", "pay_out", "expenses"].includes(selectedReport.id) && (
                           <><th>Date & Voucher</th><th>Party / Payee</th><th>Category</th><th>Account</th><th>Amount</th></>
                         )}
+                        {selectedReport.id === "trip_profit_loss" && (
+                          <><th>Trip</th><th>Party & Vehicle</th><th>Freight</th><th>Pay In</th><th>Pay Out</th><th>Expense</th><th>Profit/Loss</th></>
+                        )}
                         {selectedReport.id === "all_bookings" && (
                           <><th>Date & LR No</th><th>Party & Vehicle</th><th>Route Details</th><th>Financials</th><th>Status</th></>
                         )}
@@ -261,6 +349,38 @@ function Reports() {
                           <td style={{ padding: "12px", fontWeight: "bold", color: selectedReport.id === "pay_in" ? "#16a34a" : "#dc2626" }}>{formatCurrency(t.amount)}</td>
                         </tr>
                       ))}
+
+                      {selectedReport.id === "trip_profit_loss" && (
+                        <>
+                          <tr style={{ background: "#f8fafc", borderBottom: "2px solid #e2e8f0", fontWeight: "bold" }}>
+                            <td style={{ padding: "12px" }} colSpan={2}>Totals</td>
+                            <td style={{ padding: "12px" }}>{formatCurrency(tripProfitTotals.freight)}</td>
+                            <td style={{ padding: "12px", color: "#16a34a" }}>{formatCurrency(tripProfitTotals.payIn)}</td>
+                            <td style={{ padding: "12px", color: "#dc2626" }}>{formatCurrency(tripProfitTotals.payOut)}</td>
+                            <td style={{ padding: "12px", color: "#dc2626" }}>{formatCurrency(tripProfitTotals.expense)}</td>
+                            <td style={{ padding: "12px", color: tripProfitTotals.profit >= 0 ? "#16a34a" : "#dc2626" }}>{formatCurrency(tripProfitTotals.profit)}</td>
+                          </tr>
+                          {tripProfitLoss.map((trip) => (
+                            <tr key={trip.id} style={{ borderBottom: "1px solid #f1f5f9" }}>
+                              <td style={{ padding: "12px" }}>
+                                <strong>{trip.trackingId || trip.id}</strong><br/>
+                                <span style={{ color: "#64748b", fontSize: "0.8rem" }}>LR: {trip.lrNumber || "-"} | {trip.loadingDate || "-"}</span>
+                              </td>
+                              <td style={{ padding: "12px" }}>
+                                <strong>{trip.party || "-"}</strong><br/>
+                                <span style={{ color: "#64748b", fontSize: "0.8rem" }}>{trip.vehicle || "-"} | {trip.from || "-"} to {trip.to || "-"}</span>
+                              </td>
+                              <td style={{ padding: "12px", fontWeight: "bold" }}>{formatCurrency(trip.freight)}</td>
+                              <td style={{ padding: "12px", color: "#16a34a", fontWeight: "bold" }}>{formatCurrency(trip.payInTotal)}</td>
+                              <td style={{ padding: "12px", color: "#dc2626", fontWeight: "bold" }}>{formatCurrency(trip.payOutTotal)}</td>
+                              <td style={{ padding: "12px", color: "#dc2626", fontWeight: "bold" }}>{formatCurrency(trip.expenseTotal)}</td>
+                              <td style={{ padding: "12px", color: trip.profit >= 0 ? "#16a34a" : "#dc2626", fontWeight: "bold" }}>
+                                {formatCurrency(trip.profit)}
+                              </td>
+                            </tr>
+                          ))}
+                        </>
+                      )}
 
                       {/* BOOKINGS RENDERER */}
                       {selectedReport.id === "all_bookings" && filteredBookings.map((b) => (
