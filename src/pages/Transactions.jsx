@@ -314,6 +314,21 @@ function TransactionList() {
                           <strong style={{ color: "#334155" }}>{trx.partyName || trx.payeeName || trx.targetName || trx.payee || "General"}</strong>
                         </div>
                         <small style={{ color: "#64748b", display: "block" }}>{trx.category || "Payment"} {trx.notes ? `| ${trx.notes}` : ""}</small>
+                        {Array.isArray(trx.attachments) && trx.attachments.length > 0 && (
+                          <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", marginTop: "6px" }}>
+                            {trx.attachments.map((attachment, index) => (
+                              <a
+                                key={attachment.path || attachment.url || index}
+                                href={attachment.url}
+                                target="_blank"
+                                rel="noreferrer"
+                                style={{ color: "#2563eb", fontSize: "0.78rem", fontWeight: "700" }}
+                              >
+                                Proof {index + 1}
+                              </a>
+                            ))}
+                          </div>
+                        )}
                       </td>
                       <td style={{ padding: "1rem", color: "#475569", fontWeight: "500" }}>{trx.paymentAccount || trx.paymentMode}</td>
                       
@@ -621,6 +636,22 @@ function TransactionList() {
                     {receiptModal.transaction.notes && (
                       <div style={{ marginBottom: "5px" }}>
                         <strong>Notes:</strong> {receiptModal.transaction.notes}
+                      </div>
+                    )}
+                    {Array.isArray(receiptModal.transaction.attachments) && receiptModal.transaction.attachments.length > 0 && (
+                      <div style={{ marginBottom: "5px" }}>
+                        <strong>Proof:</strong>{" "}
+                        {receiptModal.transaction.attachments.map((attachment, index) => (
+                          <a
+                            key={attachment.path || attachment.url || index}
+                            href={attachment.url}
+                            target="_blank"
+                            rel="noreferrer"
+                            style={{ color: "#2563eb", marginRight: "8px" }}
+                          >
+                            {attachment.name || `Attachment ${index + 1}`}
+                          </a>
+                        ))}
                       </div>
                     )}
                   </div>

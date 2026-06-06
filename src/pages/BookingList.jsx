@@ -470,6 +470,22 @@ function BookingList() {
                       <div className="detail-item"><Calendar size={16} /><div><small>Date & LR</small><p>{b.loadingDate || "-"} | LR: {b.lrNumber || "-"}</p></div></div>
                     </div>
 
+                    {Array.isArray(b.attachments) && b.attachments.length > 0 && (
+                      <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", marginBottom: "1rem" }}>
+                        {b.attachments.map((attachment, index) => (
+                          <a
+                            key={attachment.path || attachment.url || index}
+                            href={attachment.url}
+                            target="_blank"
+                            rel="noreferrer"
+                            style={{ color: "#2563eb", fontSize: "0.82rem", fontWeight: "800" }}
+                          >
+                            Document {index + 1}
+                          </a>
+                        ))}
+                      </div>
+                    )}
+
                     <div className="card-footer">
                       <div className="financial-summary">
                         <span>Total: <strong>₹{b.freight || 0}</strong></span>

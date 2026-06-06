@@ -5,7 +5,6 @@ import { db } from "../firebase";
 import { collection, getDocs } from "firebase/firestore";
 import { Landmark, Coins, TrendingUp, TrendingDown, IndianRupee, Wallet, BarChart3, Building2 } from "lucide-react";
 import { buildPartyBalanceMap, getAccountFinancialSummary } from "../utils/finance";
-import { getCurrentMonthRange, isRecordInDateRange } from "../utils/dateRange";
 import "./AddDriver.css"; // Safely reusing your premium UI styles
 
 function Accounts() {
@@ -34,16 +33,9 @@ function Accounts() {
         const transactions = trxSnap.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
         const bookings = bookSnap.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
         const parties = partySnap.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
-        const { fromDate, toDate } = getCurrentMonthRange();
-        const monthTransactions = transactions.filter((transaction) =>
-          isRecordInDateRange(transaction, ["date", "createdAt"], fromDate, toDate)
-        );
-        const monthBookings = bookings.filter((booking) =>
-          isRecordInDateRange(booking, ["loadingDate", "createdAt"], fromDate, toDate)
-        );
 
-        const accountSummary = getAccountFinancialSummary(accounts, monthTransactions);
-        const partyBalanceMap = buildPartyBalanceMap(parties, monthBookings, monthTransactions);
+        const accountSummary = getAccountFinancialSummary(accounts, transactions);
+        const partyBalanceMap = buildPartyBalanceMap(parties, bookings, transactions);
         const outstandingMarket = Object.values(partyBalanceMap).reduce(
           (sum, summary) => sum + Math.max(summary.currentBalance || 0, 0),
           0
@@ -79,7 +71,7 @@ function Accounts() {
             <BarChart3 size={32} color="#2563eb" />
             <div>
               <h2 style={{ margin: 0, color: "#1e293b", fontSize: "2rem" }}>Financial Overview</h2>
-              <p style={{ margin: "5px 0 0 0", color: "#64748b" }}>Current month tracking of cash, banks, income, and market dues.</p>
+              <p style={{ margin: "5px 0 0 0", color: "#64748b" }}>Live tracking of cash, banks, income, and market dues.</p>
             </div>
           </div>
         </div>
@@ -125,7 +117,7 @@ function Accounts() {
               <div style={{ background: "#f0fdf4", padding: "1.5rem", borderRadius: "16px", border: "1px solid #bbf7d0" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "10px" }}>
                   <TrendingUp size={20} color="#166534" />
-                  <span style={{ color: "#166534", fontWeight: "bold" }}>Total Income (Current Month)</span>
+                  <span style={{ color: "#166534", fontWeight: "bold" }}>Total Income</span>
                 </div>
                 <h3 style={{ margin: 0, fontSize: "1.8rem", color: "#14532d" }}>₹ {financials.totalIn.toLocaleString('en-IN')}</h3>
               </div>

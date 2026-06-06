@@ -71,6 +71,7 @@ function ExpenseApprovals() {
             : `Approved Driver Submission${submission.notes ? `: ${submission.notes}` : ""}`,
         type: "EXPENSE",
         createdAt: new Date().toISOString(),
+        attachments: submission.attachments || [],
       });
 
       await deleteDoc(doc(db, "driver_submissions", submission.id));
@@ -222,6 +223,23 @@ function ExpenseApprovals() {
                         : "Use driver advance / company account"}
                     </div>
                   </div>
+
+                  {Array.isArray(submission.attachments) && submission.attachments.length > 0 && (
+                    <div style={{ margin: "10px 0", display: "grid", gap: "6px" }}>
+                      <strong style={{ color: "#334155", fontSize: "0.85rem" }}>Uploaded Proof</strong>
+                      {submission.attachments.map((attachment, index) => (
+                        <a
+                          key={attachment.path || attachment.url || index}
+                          href={attachment.url}
+                          target="_blank"
+                          rel="noreferrer"
+                          style={{ color: "#2563eb", fontWeight: "700", fontSize: "0.85rem", overflowWrap: "anywhere" }}
+                        >
+                          {attachment.name || `Attachment ${index + 1}`}
+                        </a>
+                      ))}
+                    </div>
+                  )}
 
                   <div style={{ borderTop: "1px solid #e2e8f0", paddingTop: "10px" }}>
                     <label

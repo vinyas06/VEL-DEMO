@@ -9,6 +9,8 @@ import {
   Users,
   Link2,
 } from "lucide-react";
+import AttachmentUploader from "../components/AttachmentUploader";
+import { uploadAttachments } from "../utils/attachments";
 import { buildAgentBalanceMap, buildPartyBalanceMap } from "../utils/finance";
 import { logActivity } from "../utils/activityLog";
 import "./AddDriver.css";
@@ -30,6 +32,7 @@ function PaymentOut() {
   const [bookings, setBookings] = useState([]);
   const [transactions, setTransactions] = useState([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [attachmentFiles, setAttachmentFiles] = useState([]);
 
   const [form, setForm] = useState({
     voucherNo: buildVoucherNumber(),
@@ -162,6 +165,16 @@ function PaymentOut() {
     }
 
     const timestamp = new Date().toISOString();
+    setIsSubmitting(true);
+    let attachments = [];
+    try {
+      attachments = await uploadAttachments(attachmentFiles, "payment-out", form.voucherNo);
+    } catch (error) {
+      console.error("Error uploading payment attachments:", error);
+      setIsSubmitting(false);
+      return alert("Could not upload selected image/file. Please try again.");
+    }
+
     const payload = {
       voucherNo: form.voucherNo,
       date: form.date,
@@ -177,9 +190,9 @@ function PaymentOut() {
       notes: form.notes,
       type: "OUT",
       createdAt: timestamp,
+      attachments,
     };
 
-    setIsSubmitting(true);
     try {
       const docRef = await addDoc(collection(db, "transactions"), payload);
       setTransactions((prev) => [...prev, { id: docRef.id, ...payload }]);
@@ -206,6 +219,7 @@ function PaymentOut() {
         notes: "",
         type: "OUT",
       });
+      setAttachmentFiles([]);
     } catch (error) {
       console.error("Error saving payment out:", error);
       alert("Error saving payment.");
@@ -443,6 +457,13 @@ function PaymentOut() {
               onChange={handleChange}
             />
           </div>
+
+          <AttachmentUploader
+            files={attachmentFiles}
+            onFilesChange={setAttachmentFiles}
+            label="Payment Proof"
+            hint="Use camera for receipt/cash proof or choose voucher image/PDF."
+          />
 
           <div className="full-width mt-4">
             <button

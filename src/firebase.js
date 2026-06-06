@@ -1,5 +1,6 @@
 import { initializeApp } from "firebase/app";
 import { getFirestore } from "firebase/firestore";
+import { getStorage } from "firebase/storage";
 import { getAnalytics } from "firebase/analytics";
 import { initializeAppCheck, ReCaptchaEnterpriseProvider } from "firebase/app-check";
 
@@ -23,3 +24,4 @@ const appCheck = initializeAppCheck(app, {
 });
 
 export const db = getFirestore(app);
+export const storage = getStorage(app);

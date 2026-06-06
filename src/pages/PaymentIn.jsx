@@ -10,6 +10,8 @@ import {
   Landmark,
   Link2,
 } from "lucide-react";
+import AttachmentUploader from "../components/AttachmentUploader";
+import { uploadAttachments } from "../utils/attachments";
 import { buildPartyBalanceMap } from "../utils/finance";
 import { logActivity } from "../utils/activityLog";
 import "./AddDriver.css";
@@ -29,6 +31,7 @@ function PaymentIn() {
   const [bookings, setBookings] = useState([]);
   const [transactions, setTransactions] = useState([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [attachmentFiles, setAttachmentFiles] = useState([]);
 
   const [form, setForm] = useState({
     voucherNo: buildReceiptNumber(),
@@ -123,6 +126,16 @@ function PaymentIn() {
     }
 
     const timestamp = new Date().toISOString();
+    setIsSubmitting(true);
+    let attachments = [];
+    try {
+      attachments = await uploadAttachments(attachmentFiles, "payment-in", form.voucherNo);
+    } catch (error) {
+      console.error("Error uploading receipt attachments:", error);
+      setIsSubmitting(false);
+      return alert("Could not upload selected image/file. Please try again.");
+    }
+
     const payload = {
       voucherNo: form.voucherNo,
       date: form.date,
@@ -138,9 +151,9 @@ function PaymentIn() {
       type: "IN",
       category: "Party Receipt",
       createdAt: timestamp,
+      attachments,
     };
 
-    setIsSubmitting(true);
     try {
       const docRef = await addDoc(collection(db, "transactions"), payload);
       setTransactions((prev) => [...prev, { id: docRef.id, ...payload }]);
@@ -167,6 +180,7 @@ function PaymentIn() {
         type: "IN",
         category: "Party Receipt",
       });
+      setAttachmentFiles([]);
     } catch (error) {
       console.error("Error saving payment in:", error);
       alert("Error saving payment.");
@@ -395,6 +409,13 @@ function PaymentIn() {
               onChange={handleChange}
             />
           </div>
+
+          <AttachmentUploader
+            files={attachmentFiles}
+            onFilesChange={setAttachmentFiles}
+            label="Receipt Image / Proof"
+            hint="Use camera for cheque/cash proof or choose receipt image/PDF."
+          />
 
           <div className="full-width mt-4">
             <button

@@ -4,6 +4,8 @@ import Navbar from "../components/Navbar";
 import { db } from "../firebase";
 import { collection, addDoc, getDocs, updateDoc, doc } from "firebase/firestore"; 
 import { Briefcase, MapPin, Truck, Navigation, Box, Users, FileText, Landmark } from "lucide-react"; 
+import AttachmentUploader from "../components/AttachmentUploader";
+import { uploadAttachments } from "../utils/attachments";
 import { logActivity } from "../utils/activityLog";
 import { sendCustomerNotification } from "../utils/portalAuth"; 
 import "./AddDriver.css"; 
@@ -48,6 +50,7 @@ function NewBooking() {
   const [agents, setAgents] = useState([]); 
   const [accounts, setAccounts] = useState([]); 
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [attachmentFiles, setAttachmentFiles] = useState([]);
 
   const [form, setForm] = useState({
     trackingId: generate6DigitId(), 
@@ -187,6 +190,7 @@ function NewBooking() {
     setIsSubmitting(true);
     try {
       const timestamp = new Date().toISOString();
+      const attachments = await uploadAttachments(attachmentFiles, "bookings", form.trackingId);
 
       const bookingRef = await addDoc(collection(db, "bookings"), {
         trackingId: form.trackingId, 
@@ -209,7 +213,8 @@ function NewBooking() {
         createdAt: timestamp,
         billingDistance: form.exactDistance,
         rateType: form.freightType,
-        convertedFromEstimateId: estimateData?.id || null 
+        convertedFromEstimateId: estimateData?.id || null,
+        attachments,
       });
       
       await logActivity(db, {
@@ -253,7 +258,8 @@ function NewBooking() {
           referenceNo: `LR: ${form.lrNumber || form.trackingId}`,
           notes: "Trip Advance Received",
           type: "IN",
-          category: "Trip Advance"
+          category: "Trip Advance",
+          attachments,
         });
       }
 
@@ -270,7 +276,8 @@ function NewBooking() {
           referenceNo: `LR: ${form.lrNumber || form.trackingId}`,
           notes: "Broker Commission Paid",
           type: "OUT",
-          category: "Commission Agent"
+          category: "Commission Agent",
+          attachments,
         });
       }
 
@@ -459,6 +466,13 @@ function NewBooking() {
               {accounts.map(acc => <option key={acc.id} value={acc.accountName}>{acc.accountName}</option>)}
             </select>
           </div>
+
+          <AttachmentUploader
+            files={attachmentFiles}
+            onFilesChange={setAttachmentFiles}
+            label="Booking Documents / Photos"
+            hint="Upload LR, loading photo, invoice proof, or any booking document."
+          />
 
           <div className="full-width mt-4">
             <button className="btn-submit" onClick={handleSave} disabled={isSubmitting}>

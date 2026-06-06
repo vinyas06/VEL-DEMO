@@ -48,6 +48,7 @@ import Loans from "./pages/Loans";
 import DriverSalaryLedger from "./pages/DriverSalaryLedger";
 import DriverAdvances from "./pages/DriverAdvances";
 import SelfTransfer from "./pages/SelfTransfer";
+import FamilyCreditDebit from "./pages/FamilyCreditDebit";
 import ConsolidatedBill from "./pages/ConsolidatedBill";
 
 import Reports from "./pages/Reports";
@@ -233,6 +234,7 @@ function App() {
           <Route path="/driver-salary-ledger" element={<ProtectedAdmin><DriverSalaryLedger /></ProtectedAdmin>} />
           <Route path="/driver-advances" element={<ProtectedAdmin><DriverAdvances /></ProtectedAdmin>} />
           <Route path="/self-transfer" element={<ProtectedAdmin><SelfTransfer /></ProtectedAdmin>} />
+          <Route path="/family-credit-debit" element={<ProtectedAdmin><FamilyCreditDebit /></ProtectedAdmin>} />
           <Route path="/approve-expenses" element={<ProtectedAdmin><ExpenseApprovals /></ProtectedAdmin>} />
         
           <Route path="/approvals" element={<ProtectedMainAdmin><PendingApprovals /></ProtectedMainAdmin>} />

@@ -73,6 +73,7 @@ const getAdminSections = (user) => [
       { to: "/approve-expenses", label: "Approve Expenses", icon: ClipboardList },
       { to: "/consolidated-bill", label: "Consolidated Bill", icon: FileText },
       { to: "/add-account", label: "Add Account", icon: Landmark },
+      { to: "/family-credit-debit", label: "Family Credit/Debit", icon: Wallet },
     ],
   },
   {

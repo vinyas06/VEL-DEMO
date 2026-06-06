@@ -3,6 +3,8 @@ import { useNavigate } from "react-router-dom";
 import { db } from "../firebase";
 import { collection, query, where, getDocs, addDoc, updateDoc, doc, or } from "firebase/firestore";
 import { Truck, MapPin, Navigation, PlusCircle, CheckCircle, LogOut, User, Clock, AlertTriangle, ArrowRightCircle, IndianRupee, X, WalletCards, Calendar } from "lucide-react";
+import AttachmentUploader from "../components/AttachmentUploader";
+import { uploadAttachments } from "../utils/attachments";
 import { logActivity } from "../utils/activityLog";
 import "./DriverDashboard.css"; 
 
@@ -99,6 +101,7 @@ function DriverDashboard() {
   const [statusOdo, setStatusOdo] = useState("");
   
   const [expenseForm, setExpenseForm] = useState({ type: "Petrol", amount: "", description: "", deductionSource: "admin_account" });
+  const [expenseAttachmentFiles, setExpenseAttachmentFiles] = useState([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submittingStatus, setSubmittingStatus] = useState(null); 
 
@@ -246,6 +249,8 @@ function DriverDashboard() {
     if (!expenseForm.amount) return alert("Please enter the amount.");
     setIsSubmitting(true);
     try {
+      const recordKey = `${loggedInDriverName}-${selectedTrip.trackingId || selectedTrip.id}-${Date.now()}`;
+      const attachments = await uploadAttachments(expenseAttachmentFiles, "driver-expenses", recordKey);
       const payload = {
         date: new Date().toISOString().split("T")[0],
         category: expenseForm.type,
@@ -257,7 +262,8 @@ function DriverDashboard() {
         notes: expenseForm.description,
         deductionSource: expenseForm.deductionSource,
         createdAt: new Date().toISOString(),
-        status: "Pending Approval"
+        status: "Pending Approval",
+        attachments,
       };
       const docRef = await addDoc(collection(db, "driver_submissions"), payload);
       await logActivity(db, {
@@ -278,6 +284,7 @@ function DriverDashboard() {
       alert("Expense submitted to Admin! ✅");
       setShowExpenseModal(false);
       setExpenseForm({ type: "Petrol", amount: "", description: "", deductionSource: "admin_account" });
+      setExpenseAttachmentFiles([]);
     } catch {
       alert("Error submitting expense.");
     } finally {
@@ -449,7 +456,7 @@ function DriverDashboard() {
                     
                     <button 
                       className="btn-action secondary"
-                      onClick={() => { setSelectedTrip(trip); setShowExpenseModal(true); }}
+                      onClick={() => { setSelectedTrip(trip); setExpenseAttachmentFiles([]); setShowExpenseModal(true); }}
                       style={{ display: "flex", alignItems: "center", gap: "8px", flex: 1, justifyContent: "center", padding: "12px", background: "#f59e0b", color: "white", borderRadius: "8px", border: "none", fontWeight: "bold" }}
                     >
                       <PlusCircle size={18} /> Add Expense
@@ -664,8 +671,15 @@ function DriverDashboard() {
                 <input style={{ width: "100%", padding: "10px", borderRadius: "6px", border: "1px solid #cbd5e1", boxSizing: "border-box" }} type="text" placeholder="e.g. Pump name, Toll plaza name" value={expenseForm.description} onChange={(e) => setExpenseForm({...expenseForm, description: e.target.value})} />
               </div>
 
+              <AttachmentUploader
+                files={expenseAttachmentFiles}
+                onFilesChange={setExpenseAttachmentFiles}
+                label="Expense Bill / Photo"
+                hint="Take a photo or choose an image/PDF from your phone."
+              />
+
               <div style={{ display: "flex", gap: "10px", marginTop: "10px" }}>
-                <button style={{ flex: 1, padding: "12px", background: "#f1f5f9", color: "#475569", border: "none", borderRadius: "8px", fontWeight: "bold" }} onClick={() => setShowExpenseModal(false)}>Cancel</button>
+                <button style={{ flex: 1, padding: "12px", background: "#f1f5f9", color: "#475569", border: "none", borderRadius: "8px", fontWeight: "bold" }} onClick={() => { setShowExpenseModal(false); setExpenseAttachmentFiles([]); }}>Cancel</button>
                 <button style={{ flex: 1, padding: "12px", background: "#10b981", color: "white", border: "none", borderRadius: "8px", fontWeight: "bold" }} onClick={handleExpenseSubmit} disabled={isSubmitting}>
                   {isSubmitting ? "Submitting..." : "Submit"}
                 </button>

@@ -3,6 +3,8 @@ import Navbar from "../components/Navbar";
 import { db } from "../firebase";
 import { collection, addDoc, getDocs } from "firebase/firestore";
 import { TrendingDown, IndianRupee, Wrench, Landmark, Route, Truck, User, Building2 } from "lucide-react";
+import AttachmentUploader from "../components/AttachmentUploader";
+import { uploadAttachments } from "../utils/attachments";
 import { getDriverCarryForwardToMonth, getDriverMonthSummary } from "../utils/driverSalary";
 import { logActivity } from "../utils/activityLog";
 import "./AddDriver.css";
@@ -32,6 +34,7 @@ function AddExpense() {
   const [transactions, setTransactions] = useState([]);
   const [submissions, setSubmissions] = useState([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [attachmentFiles, setAttachmentFiles] = useState([]);
 
   const [form, setForm] = useState({
     voucherNo: buildExpenseVoucher(),
@@ -174,6 +177,7 @@ function AddExpense() {
 
     setIsSubmitting(true);
     try {
+      const attachments = await uploadAttachments(attachmentFiles, "expenses", form.voucherNo);
       const payload = {
         ...form,
         targetName: form.targetName || (selectedCategory.target === "office" ? "Office / Admin" : ""),
@@ -186,6 +190,7 @@ function AddExpense() {
         loanId: needsLoan ? form.loanId : "",
         amount: Number(form.amount),
         createdAt: new Date().toISOString(),
+        attachments,
       };
       const docRef = await addDoc(collection(db, "transactions"), payload);
       await logActivity(db, {
@@ -210,6 +215,7 @@ function AddExpense() {
         paymentAccount: "",
         notes: "",
       });
+      setAttachmentFiles([]);
     } catch (error) {
       console.error("Error saving expense:", error);
       alert("Error saving expense.");
@@ -365,6 +371,13 @@ function AddExpense() {
             <label>Details / Description</label>
             <input name="notes" placeholder="Pump name, toll plaza, EMI note, workshop, or loading details" value={form.notes} onChange={handleChange} />
           </div>
+
+          <AttachmentUploader
+            files={attachmentFiles}
+            onFilesChange={setAttachmentFiles}
+            label="Expense Bill / Proof"
+            hint="Use camera for fuel/toll bill or choose image/PDF."
+          />
 
           <div className="full-width mt-4">
             <button className="btn-submit" onClick={handleSave} disabled={isSubmitting} style={{ background: "#f97316" }}>

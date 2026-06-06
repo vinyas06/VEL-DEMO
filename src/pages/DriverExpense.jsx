@@ -4,6 +4,8 @@ import Navbar from "../components/Navbar";
 import { db } from "../firebase";
 import { collection, addDoc, getDocs, query, where, or } from "firebase/firestore";
 import { Send, ClipboardList, Link2, Truck, WalletCards, ArrowLeft } from "lucide-react";
+import AttachmentUploader from "../components/AttachmentUploader";
+import { uploadAttachments } from "../utils/attachments";
 import { logActivity } from "../utils/activityLog";
 import "./AddDriver.css";
 
@@ -61,6 +63,7 @@ function DriverExpense() {
   const [wallet, setWallet] = useState({ givenByAdmin: 0, approvedSpent: 0, pendingSpent: 0, available: 0 });
   const [submissions, setSubmissions] = useState([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [attachmentFiles, setAttachmentFiles] = useState([]);
   const [form, setForm] = useState({
     date: new Date().toISOString().split("T")[0],
     category: "Petrol",
@@ -126,6 +129,8 @@ function DriverExpense() {
 
     setIsSubmitting(true);
     try {
+      const recordKey = `${user?.name || "driver"}-${form.trackingId || form.bookingId}-${Date.now()}`;
+      const attachments = await uploadAttachments(attachmentFiles, "driver-expenses", recordKey);
       const payload = {
         ...form,
         driverName: user?.name || "Unknown Driver",
@@ -133,6 +138,7 @@ function DriverExpense() {
         deductionSource: form.deductionSource,
         status: "Pending Approval",
         createdAt: new Date().toISOString(),
+        attachments,
       };
       const docRef = await addDoc(collection(db, "driver_submissions"), payload);
       await logActivity(db, {
@@ -163,6 +169,7 @@ function DriverExpense() {
         deductionSource: "admin_account",
         notes: "",
       });
+      setAttachmentFiles([]);
     } catch (error) {
       console.error("Error submitting driver expense:", error);
       alert("Error submitting expense.");
@@ -313,6 +320,13 @@ function DriverExpense() {
               onChange={(event) => setForm({ ...form, notes: event.target.value })}
             />
           </div>
+
+          <AttachmentUploader
+            files={attachmentFiles}
+            onFilesChange={setAttachmentFiles}
+            label="Expense Bill / Photo"
+            hint="Take a bill photo or choose an image/PDF before submitting."
+          />
 
           <button className="btn-submit full-width" onClick={handleSend} disabled={isSubmitting}>
             {isSubmitting ? "Sending..." : "Submit to Admin"}{" "}
