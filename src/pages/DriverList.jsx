@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import Navbar from "../components/Navbar";
 import Modal from "../components/Modal";
 import { db } from "../firebase";
-import { collection, getDocs, updateDoc, doc } from "firebase/firestore";
+import { collection, doc, updateDoc, onSnapshot } from "firebase/firestore";
 import { Search, User, Phone, FileText, Edit, Eye, ShieldAlert } from "lucide-react";
 import { logActivity } from "../utils/activityLog";
 import "./DriverList.css"; 
@@ -44,28 +44,28 @@ function DriverList() {
   const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
-    const fetchDrivers = async () => {
-      try {
-        const [driverSnap, bookingSnap, transactionSnap, submissionSnap] = await Promise.all([
-          getDocs(collection(db, "drivers")),
-          getDocs(collection(db, "bookings")),
-          getDocs(collection(db, "transactions")),
-          getDocs(collection(db, "driver_submissions")),
-        ]);
-        const data = driverSnap.docs.map(d => ({ id: d.id, ...d.data() }));
-        // Sort by name
-        data.sort((a, b) => (a.name || "").localeCompare(b.name || ""));
-        setDrivers(data);
-        setBookings(bookingSnap.docs.map((docItem) => ({ id: docItem.id, ...docItem.data() })));
-        setTransactions(transactionSnap.docs.map((docItem) => ({ id: docItem.id, ...docItem.data() })));
-        setSubmissions(submissionSnap.docs.map((docItem) => ({ id: docItem.id, ...docItem.data() })));
-      } catch (error) {
-        console.error("Error fetching drivers:", error);
-      } finally {
-        setLoading(false);
-      }
+    const unsubDrivers = onSnapshot(collection(db, "drivers"), (snap) => {
+      const data = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      data.sort((a, b) => (a.name || "").localeCompare(b.name || ""));
+      setDrivers(data);
+      setLoading(false);
+    });
+    const unsubBookings = onSnapshot(collection(db, "bookings"), (snap) => {
+      setBookings(snap.docs.map(docItem => ({ id: docItem.id, ...docItem.data() })));
+    });
+    const unsubTransactions = onSnapshot(collection(db, "transactions"), (snap) => {
+      setTransactions(snap.docs.map(docItem => ({ id: docItem.id, ...docItem.data() })));
+    });
+    const unsubSubmissions = onSnapshot(collection(db, "driver_submissions"), (snap) => {
+      setSubmissions(snap.docs.map(docItem => ({ id: docItem.id, ...docItem.data() })));
+    });
+
+    return () => {
+      unsubDrivers();
+      unsubBookings();
+      unsubTransactions();
+      unsubSubmissions();
     };
-    fetchDrivers();
   }, []);
 
   const handleUpdate = async () => {

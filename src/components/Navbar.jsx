@@ -15,6 +15,7 @@ const getAdminSections = (user) => [
     title: "Overview",
     items: [
       { to: "/", label: "Dashboard", icon: LayoutDashboard },
+      { to: "/tracking", label: "Live Tracking", icon: MapPin },
       { to: "/reports", label: "Reports", icon: FileBarChart },
       // 🔥 This will now reliably show both User Approvals AND Activity Logs!
       ...(isMainAdminUser(user)

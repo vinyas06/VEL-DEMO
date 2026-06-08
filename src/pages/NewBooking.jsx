@@ -60,8 +60,11 @@ function NewBooking() {
     driver: estimateData?.driver || "",
     driver2: "", // 🔥 NEW: Co-driver
     agent: estimateData?.agent || "", 
+    agentNo: "",
     from: estimateData?.from || "",
+    pickupPartyNo: "",
     to: estimateData?.to || "",
+    deliveryPartyNo: "",
     material: estimateData?.material || "",
     weight: estimateData?.weight || "",
     loadingDate: estimateData?.loadingDate || new Date().toISOString().split('T')[0],
@@ -99,7 +102,7 @@ function NewBooking() {
         
         setVehicles(vSnap.docs.map(d => d.data().number));
         setDrivers(dSnap.docs.map(d => d.data().name));
-        setAgents(aSnap.docs.map(d => ({ id: d.id, name: d.data().name, rate: d.data().commissionRate || 0 })));
+        setAgents(aSnap.docs.map(d => ({ id: d.id, name: d.data().name, rate: d.data().commissionRate || 0, phone: d.data().phone || "" })));
         setAccounts(accSnap.docs.map(d => ({ id: d.id, ...d.data() })));
         setForm((prev) => ({
           ...prev,
@@ -136,10 +139,10 @@ function NewBooking() {
     const getDistance = async () => {
       if (fromCoords && toCoords) {
         try {
-          const res = await fetch(`https://api.geoapify.com/v1/routing?waypoints=${fromCoords.lat},${fromCoords.lon}|${toCoords.lat},${toCoords.lon}&mode=drive&apiKey=${API_KEY}`);
+          const res = await fetch(`https://apis.mappls.com/advancedmaps/v1/2690adba2b791b087866969b1fd03a3d/route_adv/driving/${fromCoords.lon},${fromCoords.lat};${toCoords.lon},${toCoords.lat}`);
           const data = await res.json();
-          if (data.features && data.features.length > 0) {
-            const km = (data.features[0].properties.distance / 1000).toFixed(1);
+          if (data.routes && data.routes.length > 0) {
+            const km = (data.routes[0].distance / 1000).toFixed(1);
             setForm(prev => ({ ...prev, exactDistance: km })); 
           }
         } catch {
@@ -172,6 +175,17 @@ function NewBooking() {
   }, [form.agent, form.freight, agents]);
 
   const handleChange = (e) => setForm({ ...form, [e.target.name]: e.target.value });
+  
+  const handleAgentChange = (e) => {
+    const selectedAgentName = e.target.value;
+    const selectedAgent = agents.find(a => a.name === selectedAgentName);
+    setForm({ 
+      ...form, 
+      agent: selectedAgentName, 
+      agentNo: selectedAgent ? selectedAgent.phone : "" 
+    });
+  };
+
   const handleDecimalChange = (e) => {
     setForm({ ...form, [e.target.name]: sanitizeDecimalInput(e.target.value) });
   };
@@ -200,8 +214,11 @@ function NewBooking() {
         driver: form.driver,
         driver2: form.driver2 || "None", // 🔥 NEW
         agent: form.agent || "Direct", 
+        agentNo: form.agentNo || "",
         from: form.from,
+        pickupPartyNo: form.pickupPartyNo || "",
         to: form.to,
+        deliveryPartyNo: form.deliveryPartyNo || "",
         material: form.material,
         weight: form.weight,
         loadingDate: form.loadingDate,
@@ -374,10 +391,15 @@ function NewBooking() {
 
           <div className="input-group">
             <label><Users size={14} style={{display: 'inline', marginRight: '4px'}}/> Broker / Agent (Optional)</label>
-            <select name="agent" value={form.agent} onChange={handleChange}>
+            <select name="agent" value={form.agent} onChange={handleAgentChange}>
               <option value="">-- Direct Booking (No Broker) --</option>
               {agents.map(a => <option key={a.id} value={a.name}>{a.name} ({a.rate}% Comm.)</option>)}
             </select>
+          </div>
+
+          <div className="input-group">
+            <label>Agent No. (Contact)</label>
+            <input name="agentNo" value={form.agentNo} onChange={handleChange} placeholder="Fetched from DB" />
           </div>
 
           <div className="section-title full-width mt-4"><Navigation size={18} /> Route & Distance</div>
@@ -394,6 +416,11 @@ function NewBooking() {
             )}
           </div>
 
+          <div className="input-group">
+            <label>Pickup Party No. (Contact)</label>
+            <input name="pickupPartyNo" value={form.pickupPartyNo} onChange={handleChange} placeholder="e.g. 9876543210" />
+          </div>
+
           <div className="input-group" style={{ position: "relative" }}>
             <label>To (Unloading Point) *</label>
             <input placeholder="Start typing city..." value={form.to} onChange={(e) => handleLocationSearch(e.target.value, "to")} autoComplete="off" />
@@ -404,6 +431,11 @@ function NewBooking() {
                 ))}
               </ul>
             )}
+          </div>
+
+          <div className="input-group">
+            <label>Delivery Party No. (Contact)</label>
+            <input name="deliveryPartyNo" value={form.deliveryPartyNo} onChange={handleChange} placeholder="e.g. 9876543210" />
           </div>
 
           <div className="input-group">

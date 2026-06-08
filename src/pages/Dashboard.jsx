@@ -97,11 +97,18 @@ function Dashboard() {
         
         let totalIn = 0;
         let totalOut = 0;
+        let totalRevenue = 0;
 
         monthTransactions.forEach(trx => {
           const amt = Number(trx.amount) || 0;
-          if (trx.type === "IN") totalIn += amt;
-          else totalOut += amt; 
+          const isLoan = trx.category === "Owner Credit / Loan";
+          
+          if (trx.type === "IN") {
+            totalIn += amt;
+            if (!isLoan) totalRevenue += amt;
+          } else {
+            totalOut += amt; 
+          }
           
           // 🔥 Plot the daily graph data
           const dateVal = trx.date || trx.createdAt;
@@ -110,8 +117,11 @@ function Dashboard() {
             if (trxDate.getMonth() === today.getMonth() && trxDate.getFullYear() === today.getFullYear()) {
               const dayIndex = trxDate.getDate() - 1;
               if (dayIndex >= 0 && dayIndex < daysInMonth) {
-                if (trx.type === "IN") dailyData[dayIndex].Income += amt;
-                else dailyData[dayIndex].Expense += amt;
+                if (trx.type === "IN") {
+                  if (!isLoan) dailyData[dayIndex].Income += amt;
+                } else {
+                  dailyData[dayIndex].Expense += amt;
+                }
               }
             }
           }
@@ -124,7 +134,7 @@ function Dashboard() {
         const activeTripsCount = monthBookings.filter(b => activeStatuses.includes(b.status)).length;
 
         const newStats = {
-          totalProfit: totalIn,
+          totalProfit: totalRevenue,
           totalExpense: totalOut,
           cashInHand: totalIn - totalOut,
           activeTrips: activeTripsCount,

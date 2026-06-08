@@ -105,7 +105,7 @@ function BookingList() {
       setParties(pSnap.docs.map(d => d.data().name));
       setVehicles(vSnap.docs.map(d => d.data().number));
       setDrivers(dSnap.docs.map(d => d.data().name));
-      setAgents(aSnap.docs.map(d => d.data().name));
+      setAgents(aSnap.docs.map(d => ({ name: d.data().name, phone: d.data().phone || "" })));
       setAccounts(accSnap.docs.map(d => ({ id: d.id, ...d.data() })));
       setTransactions(trxSnap.docs.map(d => ({ id: d.id, ...d.data() })));
       setCompanySettings(settings);
@@ -470,19 +470,33 @@ function BookingList() {
                       <div className="detail-item"><Calendar size={16} /><div><small>Date & LR</small><p>{b.loadingDate || "-"} | LR: {b.lrNumber || "-"}</p></div></div>
                     </div>
 
-                    {Array.isArray(b.attachments) && b.attachments.length > 0 && (
+                    {(b.podUrl || (Array.isArray(b.attachments) && b.attachments.length > 0)) && (
                       <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", marginBottom: "1rem" }}>
-                        {b.attachments.map((attachment, index) => (
+                        {b.podUrl && (
                           <a
-                            key={attachment.path || attachment.url || index}
-                            href={attachment.url}
+                            href={b.podUrl}
                             target="_blank"
                             rel="noreferrer"
-                            style={{ color: "#2563eb", fontSize: "0.82rem", fontWeight: "800" }}
+                            style={{ color: "#166534", fontSize: "0.85rem", fontWeight: "800", background: "#dcfce3", padding: "4px 8px", borderRadius: "6px", textDecoration: "none", border: "1px solid #bbf7d0", display: "flex", alignItems: "center", gap: "4px" }}
                           >
-                            Document {index + 1}
+                            📄 View POD
                           </a>
-                        ))}
+                        )}
+                        {Array.isArray(b.attachments) && b.attachments.map((attachment, index) => {
+                          const url = typeof attachment === 'string' ? attachment : attachment.url;
+                          if (!url) return null;
+                          return (
+                            <a
+                              key={index}
+                              href={url}
+                              target="_blank"
+                              rel="noreferrer"
+                              style={{ color: "#2563eb", fontSize: "0.85rem", fontWeight: "800", background: "#dbeafe", padding: "4px 8px", borderRadius: "6px", textDecoration: "none", border: "1px solid #bfdbfe", display: "flex", alignItems: "center", gap: "4px" }}
+                            >
+                              📎 Document {index + 1}
+                            </a>
+                          );
+                        })}
                       </div>
                     )}
 
@@ -591,14 +605,22 @@ function BookingList() {
                 </div>
                 <div>
                   <label>Broker / Agent</label>
-                  <select className="modal-input" value={editModal.formData.agent || ""} onChange={(e) => setEditModal({...editModal, formData: {...editModal.formData, agent: e.target.value}})}>
+                  <select className="modal-input" value={editModal.formData.agent || ""} onChange={(e) => {
+                    const agentName = e.target.value;
+                    const selectedAgent = agents.find(a => a.name === agentName);
+                    setEditModal({...editModal, formData: {...editModal.formData, agent: agentName, agentNo: selectedAgent ? selectedAgent.phone : editModal.formData.agentNo}});
+                  }}>
                     <option value="">-- None --</option>
-                    {agents.map((a, i) => <option key={i} value={a}>{a}</option>)}
+                    {agents.map((a, i) => <option key={i} value={a.name}>{a.name}</option>)}
                   </select>
                 </div>
+                <div><label>Agent No.</label><input className="modal-input" value={editModal.formData.agentNo || ""} onChange={(e) => setEditModal({...editModal, formData: {...editModal.formData, agentNo: e.target.value}})} /></div>
 
                 <div><label>From (Loading Point)</label><input className="modal-input" value={editModal.formData.from || ""} onChange={(e) => setEditModal({...editModal, formData: {...editModal.formData, from: e.target.value}})} /></div>
                 <div><label>To (Unloading Point)</label><input className="modal-input" value={editModal.formData.to || ""} onChange={(e) => setEditModal({...editModal, formData: {...editModal.formData, to: e.target.value}})} /></div>
+
+                <div><label>Pickup Party No.</label><input className="modal-input" value={editModal.formData.pickupPartyNo || ""} onChange={(e) => setEditModal({...editModal, formData: {...editModal.formData, pickupPartyNo: e.target.value}})} /></div>
+                <div><label>Delivery Party No.</label><input className="modal-input" value={editModal.formData.deliveryPartyNo || ""} onChange={(e) => setEditModal({...editModal, formData: {...editModal.formData, deliveryPartyNo: e.target.value}})} /></div>
 
                 <div><label>Material</label><input className="modal-input" value={editModal.formData.material || ""} onChange={(e) => setEditModal({...editModal, formData: {...editModal.formData, material: e.target.value}})} /></div>
                 <div><label>Weight (Tons)</label><input type="number" className="modal-input" value={editModal.formData.weight || ""} onChange={(e) => setEditModal({...editModal, formData: {...editModal.formData, weight: e.target.value}})} /></div>

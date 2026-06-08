@@ -19,6 +19,7 @@ import DriverList from "./pages/DriverList";
 import DocumentAlerts from "./pages/DocumentAlerts";
 import PendingApprovals from "./pages/PendingApprovals";
 import ActivityTracker from "./pages/ActivityTracker"; 
+import TrackingDashboard from "./pages/TrackingDashboard";
 
 // --- Network (Parties & Agents) ---
 import AddParty from "./pages/AddParty";
@@ -200,6 +201,7 @@ function App() {
           <Route path="/driver-expense" element={<ProtectedDriver><DriverExpense /></ProtectedDriver>} />
 
           <Route path="/" element={<ProtectedAdmin><Dashboard /></ProtectedAdmin>} />
+          <Route path="/tracking" element={<ProtectedAdmin><TrackingDashboard /></ProtectedAdmin>} />
           <Route path="/settings" element={<ProtectedAdmin><Settings /></ProtectedAdmin>} />
           <Route path="/data-tools" element={<ProtectedAdmin><DataTools /></ProtectedAdmin>} />
           <Route path="/user-approvals" element={<ProtectedMainAdmin><UserApprovals /></ProtectedMainAdmin>} />

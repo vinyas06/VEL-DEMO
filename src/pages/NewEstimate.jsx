@@ -81,10 +81,10 @@ function NewEstimate() {
     const getDistance = async () => {
       if (fromCoords && toCoords) {
         try {
-          const res = await fetch(`https://api.geoapify.com/v1/routing?waypoints=${fromCoords.lat},${fromCoords.lon}|${toCoords.lat},${toCoords.lon}&mode=drive&apiKey=${API_KEY}`);
+          const res = await fetch(`https://apis.mappls.com/advancedmaps/v1/2690adba2b791b087866969b1fd03a3d/route_adv/driving/${fromCoords.lon},${fromCoords.lat};${toCoords.lon},${toCoords.lat}`);
           const data = await res.json();
-          if (data.features && data.features.length > 0) {
-            const km = (data.features[0].properties.distance / 1000).toFixed(1);
+          if (data.routes && data.routes.length > 0) {
+            const km = (data.routes[0].distance / 1000).toFixed(1);
             setApproxDistance(km);
             setForm(prev => ({ ...prev, exactDistance: km })); 
           }

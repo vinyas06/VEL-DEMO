@@ -4,12 +4,16 @@ import { db } from "../firebase";
 import { collection, getDocs, deleteDoc, doc, addDoc } from "firebase/firestore";
 import { CheckCircle, XCircle, Clock, IndianRupee, User, Truck, Calendar } from "lucide-react";
 import { getCurrentMonthValue, getRecordDateInput } from "../utils/dateRange";
+import { getDriverMonthSummary, getDriverCarryForwardToMonth } from "../utils/driverSalary";
 import { logActivity } from "../utils/activityLog";
 import "./BookingList.css";
 
 function ExpenseApprovals() {
   const [submissions, setSubmissions] = useState([]);
   const [accounts, setAccounts] = useState([]);
+  const [drivers, setDrivers] = useState([]);
+  const [bookings, setBookings] = useState([]);
+  const [transactions, setTransactions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedAcc, setSelectedAcc] = useState({});
   const [selectedDeduction, setSelectedDeduction] = useState({});
@@ -17,7 +21,14 @@ function ExpenseApprovals() {
 
   const fetchData = async () => {
     try {
-      const subSnap = await getDocs(collection(db, "driver_submissions"));
+      const [subSnap, accSnap, driverSnap, bookingSnap, trxSnap] = await Promise.all([
+        getDocs(collection(db, "driver_submissions")),
+        getDocs(collection(db, "accounts")),
+        getDocs(collection(db, "drivers")),
+        getDocs(collection(db, "bookings")),
+        getDocs(collection(db, "transactions"))
+      ]);
+
       const submissionData = subSnap.docs
         .map((docItem) => ({ id: docItem.id, ...docItem.data() }))
         .sort(
@@ -25,9 +36,10 @@ function ExpenseApprovals() {
             new Date(b.createdAt || b.date || 0) - new Date(a.createdAt || a.date || 0)
         );
       setSubmissions(submissionData);
-
-      const accSnap = await getDocs(collection(db, "accounts"));
       setAccounts(accSnap.docs.map((docItem) => ({ id: docItem.id, ...docItem.data() })));
+      setDrivers(driverSnap.docs.map((docItem) => ({ id: docItem.id, ...docItem.data() })));
+      setBookings(bookingSnap.docs.map((docItem) => ({ id: docItem.id, ...docItem.data() })));
+      setTransactions(trxSnap.docs.map((docItem) => ({ id: docItem.id, ...docItem.data() })));
     } catch (error) {
       console.error("Error fetching expense approvals:", error);
     } finally {
@@ -43,7 +55,7 @@ function ExpenseApprovals() {
     const deductionSource =
       selectedDeduction[submission.id] || submission.deductionSource || "admin_account";
     const accountForThis = selectedAcc[submission.id];
-    if (deductionSource === "admin_account" && !accountForThis) {
+    if (!accountForThis) {
       return alert("Please select a Payment Account first!");
     }
 
@@ -62,7 +74,7 @@ function ExpenseApprovals() {
         bookingId: submission.bookingId || "",
         bookingTrackingId: submission.trackingId || submission.tripId || "",
         amount: Number(submission.amount),
-        paymentAccount: deductionSource === "admin_account" ? accountForThis : "",
+        paymentAccount: accountForThis,
         deductionSource,
         referenceNo: tripReference,
         notes:
@@ -227,17 +239,21 @@ function ExpenseApprovals() {
                   {Array.isArray(submission.attachments) && submission.attachments.length > 0 && (
                     <div style={{ margin: "10px 0", display: "grid", gap: "6px" }}>
                       <strong style={{ color: "#334155", fontSize: "0.85rem" }}>Uploaded Proof</strong>
-                      {submission.attachments.map((attachment, index) => (
-                        <a
-                          key={attachment.path || attachment.url || index}
-                          href={attachment.url}
-                          target="_blank"
-                          rel="noreferrer"
-                          style={{ color: "#2563eb", fontWeight: "700", fontSize: "0.85rem", overflowWrap: "anywhere" }}
-                        >
-                          {attachment.name || `Attachment ${index + 1}`}
-                        </a>
-                      ))}
+                      {submission.attachments.map((attachment, index) => {
+                        const url = typeof attachment === 'string' ? attachment : attachment.url;
+                        if (!url) return null;
+                        return (
+                          <a
+                            key={index}
+                            href={url}
+                            target="_blank"
+                            rel="noreferrer"
+                            style={{ color: "#2563eb", fontWeight: "700", fontSize: "0.85rem", overflowWrap: "anywhere", background: "#dbeafe", padding: "4px 8px", borderRadius: "6px", textDecoration: "none", border: "1px solid #bfdbfe", display: "inline-flex", alignItems: "center", gap: "4px", width: "fit-content" }}
+                          >
+                            📎 {typeof attachment === 'object' && attachment.name ? attachment.name : `Proof Document ${index + 1}`}
+                          </a>
+                        );
+                      })}
                     </div>
                   )}
 
@@ -271,6 +287,39 @@ function ExpenseApprovals() {
                       <option value="driver_salary">Driver Commission</option>
                     </select>
 
+                    {(selectedDeduction[submission.id] || submission.deductionSource || "admin_account") === "driver_salary" && (
+                      (() => {
+                        const salaryMonth = submission.date.slice(0, 7);
+                        const selectedDriver = drivers.find((d) => d.name === submission.driverName);
+                        if (!selectedDriver) return null;
+                        
+                        const salarySummary = getDriverMonthSummary(selectedDriver, salaryMonth, bookings, transactions, submissions);
+                        const carriedUntilThisMonth = getDriverCarryForwardToMonth(selectedDriver, salaryMonth, bookings, transactions, submissions);
+                        const previousCarryForward = carriedUntilThisMonth - salarySummary.remainingThisMonth;
+                        const salaryBalanceBeforePayment = previousCarryForward + salarySummary.remainingThisMonth;
+                        const salaryBalanceAfterPayment = salaryBalanceBeforePayment - Number(submission.amount);
+
+                        return (
+                          <div style={{ background: "#eff6ff", border: "1px solid #bfdbfe", borderRadius: "8px", padding: "12px", marginBottom: "15px" }}>
+                            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "8px" }}>
+                              <strong style={{ color: "#1e40af", fontSize: "0.85rem" }}>Driver Balance Impact</strong>
+                              <span style={{ color: "#64748b", fontWeight: "bold", fontSize: "0.85rem" }}>{salaryMonth}</span>
+                            </div>
+                            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px", fontSize: "0.85rem" }}>
+                              <div style={{ background: "white", padding: "6px", borderRadius: "6px", border: "1px solid #dbeafe" }}>
+                                <small style={{ color: "#64748b", display: "block" }}>BEFORE</small>
+                                <strong style={{ color: salaryBalanceBeforePayment < 0 ? "#b91c1c" : "#0f172a" }}>Rs {Math.round(salaryBalanceBeforePayment).toLocaleString("en-IN")}</strong>
+                              </div>
+                              <div style={{ background: "white", padding: "6px", borderRadius: "6px", border: "1px solid #dbeafe" }}>
+                                <small style={{ color: "#64748b", display: "block" }}>AFTER DEDUCT</small>
+                                <strong style={{ color: salaryBalanceAfterPayment < 0 ? "#b91c1c" : "#0f172a" }}>Rs {Math.round(salaryBalanceAfterPayment).toLocaleString("en-IN")}</strong>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })()
+                    )}
+
                     <label
                       style={{
                         fontSize: "0.75rem",
@@ -294,12 +343,10 @@ function ExpenseApprovals() {
                         setSelectedAcc({ ...selectedAcc, [submission.id]: event.target.value })
                       }
                       value={selectedAcc[submission.id] || ""}
-                      disabled={(selectedDeduction[submission.id] || submission.deductionSource || "admin_account") === "driver_salary"}
+                      disabled={false}
                     >
                       <option value="">
-                        {(selectedDeduction[submission.id] || submission.deductionSource || "admin_account") === "driver_salary"
-                          ? "-- No account needed --"
-                          : "-- Choose Account --"}
+                        -- Choose Account --
                       </option>
                       {accounts.map((account) => (
                         <option key={account.id} value={account.accountName}>

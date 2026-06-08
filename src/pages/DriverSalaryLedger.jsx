@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Navbar from "../components/Navbar";
 import { db } from "../firebase";
-import { collection, getDocs } from "firebase/firestore";
+import { collection, onSnapshot } from "firebase/firestore";
 import { Calendar, IndianRupee, Users } from "lucide-react";
 import {
   getDriverCarryForwardToMonth,
@@ -25,30 +25,26 @@ function DriverSalaryLedger() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const [driverSnap, bookingSnap, transactionSnap, submissionSnap] = await Promise.all([
-          getDocs(collection(db, "drivers")),
-          getDocs(collection(db, "bookings")),
-          getDocs(collection(db, "transactions")),
-          getDocs(collection(db, "driver_submissions")),
-        ]);
-        setDrivers(
-          driverSnap.docs
-            .map((docItem) => ({ id: docItem.id, ...docItem.data() }))
-            .sort((a, b) => (a.name || "").localeCompare(b.name || ""))
-        );
-        setBookings(bookingSnap.docs.map((docItem) => ({ id: docItem.id, ...docItem.data() })));
-        setTransactions(transactionSnap.docs.map((docItem) => ({ id: docItem.id, ...docItem.data() })));
-        setSubmissions(submissionSnap.docs.map((docItem) => ({ id: docItem.id, ...docItem.data() })));
-      } catch (error) {
-        console.error("Error loading driver salary ledger:", error);
-      } finally {
-        setLoading(false);
-      }
-    };
+    const unsubDrivers = onSnapshot(collection(db, "drivers"), (snap) => {
+      setDrivers(snap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => (a.name || "").localeCompare(b.name || "")));
+      setLoading(false);
+    });
+    const unsubBookings = onSnapshot(collection(db, "bookings"), (snap) => {
+      setBookings(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    });
+    const unsubTransactions = onSnapshot(collection(db, "transactions"), (snap) => {
+      setTransactions(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    });
+    const unsubSubmissions = onSnapshot(collection(db, "driver_submissions"), (snap) => {
+      setSubmissions(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    });
 
-    fetchData();
+    return () => {
+      unsubDrivers();
+      unsubBookings();
+      unsubTransactions();
+      unsubSubmissions();
+    };
   }, []);
 
   const rows = useMemo(() => {
@@ -83,21 +79,56 @@ function DriverSalaryLedger() {
       (transaction) =>
         getRecordMonthKey(transaction) === selectedMonth &&
         getDriverRecordName(transaction) &&
-        (selectedDriver === "All" || getDriverRecordName(transaction) === selectedDriver)
+        (selectedDriver === "All" || getDriverRecordName(transaction) === selectedDriver) &&
+        (transaction.deductionSource === "driver_salary" || transaction.category === "Driver Salary")
     )
-    .sort((a, b) => new Date(b.createdAt || b.date || 0) - new Date(a.createdAt || a.date || 0));
+    .map(t => ({ ...t, isBooking: false }));
+  
+  const driverBookings = bookings
+    .filter(
+      (booking) =>
+        getRecordMonthKey(booking) === selectedMonth &&
+        (booking.driver || booking.driver2) &&
+        (selectedDriver === "All" || booking.driver === selectedDriver || booking.driver2 === selectedDriver)
+    )
+    .map(b => ({ ...b, isBooking: true, amount: b.freight, category: "Trip Commission" }));
+
   const pendingDriverSubmissions = submissions
     .filter(
       (submission) =>
         getRecordMonthKey(submission) === selectedMonth &&
         getDriverRecordName(submission) &&
-        (selectedDriver === "All" || getDriverRecordName(submission) === selectedDriver)
+        (selectedDriver === "All" || getDriverRecordName(submission) === selectedDriver) &&
+        submission.deductionSource === "driver_salary"
     )
-    .map((submission) => ({ ...submission, pendingSubmission: true }))
-    .sort((a, b) => new Date(b.createdAt || b.date || 0) - new Date(a.createdAt || a.date || 0));
-  const driverTransactionRows = [...driverTransactions, ...pendingDriverSubmissions].sort(
-    (a, b) => new Date(b.createdAt || b.date || 0) - new Date(a.createdAt || a.date || 0)
+    .map((submission) => ({ ...submission, isBooking: false, pendingSubmission: true }));
+
+  let driverTransactionRows = [...driverTransactions, ...driverBookings, ...pendingDriverSubmissions].sort(
+    (a, b) => new Date(a.createdAt || a.date || a.loadingDate || 0) - new Date(b.createdAt || b.date || b.loadingDate || 0)
   );
+
+  // Calculate dynamic running balance for the selected driver
+  if (selectedDriver !== "All") {
+    const driverObj = drivers.find(d => d.name === selectedDriver) || {};
+    const commissionRate = driverObj.salaryType === "fixed" ? 0 : Number(driverObj.commissionRate || 0);
+    const prevCarryForward = (rows.find(r => r.driverName === selectedDriver)?.previousCarryForward) || 0;
+    
+    let currentBalance = prevCarryForward;
+    driverTransactionRows = driverTransactionRows.map(row => {
+      if (row.isBooking) {
+        const earned = Number(row.freight || 0) * (commissionRate / 100);
+        currentBalance += earned;
+        return { ...row, dynamicBalance: currentBalance, calculatedEarned: earned };
+      } else if (row.deductionSource === "driver_salary" || row.category === "Driver Salary") {
+        currentBalance -= Number(row.amount || 0);
+        return { ...row, dynamicBalance: currentBalance };
+      }
+      return { ...row, dynamicBalance: currentBalance };
+    });
+  }
+
+  // Reverse so newest is at the top
+  driverTransactionRows.reverse();
 
   return (
     <div className="list-page-bg">
@@ -207,19 +238,22 @@ function DriverSalaryLedger() {
                     ) : (
                       driverTransactionRows.map((transaction) => (
                         <tr key={transaction.id} style={{ borderBottom: "1px solid #f1f5f9" }}>
-                          <td style={{ padding: "1rem" }}>{transaction.date || "-"}</td>
-                          <td style={{ padding: "1rem", fontWeight: "800" }}>{getDriverRecordName(transaction)}</td>
+                          <td style={{ padding: "1rem" }}>{transaction.date || transaction.loadingDate || "-"}</td>
+                          <td style={{ padding: "1rem", fontWeight: "800" }}>{transaction.isBooking ? transaction.driver || transaction.driver2 : getDriverRecordName(transaction)}</td>
                           <td style={{ padding: "1rem" }}>
                             <strong>{transaction.category || "Driver Submission"}</strong>
+                            {transaction.isBooking && <small style={{ display: "block", color: "#166534" }}>Trip: {transaction.trackingId}</small>}
                             {transaction.pendingSubmission && <small style={{ display: "block", color: "#b45309" }}>Pending Approval</small>}
                             {transaction.voucherNo && <small style={{ display: "block", color: "#94a3b8" }}>{transaction.voucherNo}</small>}
                           </td>
-                          <td style={{ padding: "1rem" }}>{transaction.paymentAccount || transaction.deductionSource || "-"}</td>
-                          <td style={{ padding: "1rem", color: "#b45309", fontWeight: "900" }}>Rs {formatMoney(transaction.amount)}</td>
+                          <td style={{ padding: "1rem" }}>{transaction.isBooking ? "Trip Completion" : transaction.paymentAccount || transaction.deductionSource || "-"}</td>
+                          <td style={{ padding: "1rem", color: transaction.isBooking ? "#166534" : "#b45309", fontWeight: "900" }}>
+                            {transaction.isBooking ? `+ Rs ${formatMoney(transaction.calculatedEarned || 0)}` : `- Rs ${formatMoney(transaction.amount)}`}
+                          </td>
                           <td style={{ padding: "1rem", fontWeight: "800" }}>
-                            {transaction.salaryBalanceAfter === "" || transaction.salaryBalanceAfter == null
+                            {selectedDriver === "All" || (!transaction.isBooking && transaction.deductionSource !== "driver_salary" && transaction.category !== "Driver Salary")
                               ? "-"
-                              : `Rs ${formatMoney(transaction.salaryBalanceAfter)}`}
+                              : `Rs ${formatMoney(transaction.dynamicBalance)}`}
                           </td>
                         </tr>
                       ))

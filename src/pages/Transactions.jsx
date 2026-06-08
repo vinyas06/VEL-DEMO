@@ -6,8 +6,35 @@ import { ArrowDownLeft, ArrowUpRight, Wallet, Printer, Download, Calendar, Edit,
 import { fetchCompanyProfile } from "../utils/companyProfile";
 import { getCurrentMonthValue, getRecordDateInput } from "../utils/dateRange";
 import { isMoneyInTransaction } from "../utils/finance";
+import { getDriverMonthSummary, getDriverCarryForwardToMonth } from "../utils/driverSalary";
 import { logActivity } from "../utils/activityLog";
 import "./BookingList.css"; 
+
+const EXPENSE_CATEGORIES = [
+  { value: "Petrol", label: "Petrol / Diesel", target: "trip" },
+  { value: "Fastag", label: "FASTag / Toll", target: "trip" },
+  { value: "Office Expense", label: "Office Expense", target: "office" },
+  { value: "Hamali/Labour Loading Unloading", label: "Hamali / Labour Loading-Unloading", target: "trip" },
+  { value: "Police Fine", label: "Police Fine", target: "trip" },
+  { value: "Check Post Police Tips", label: "Check Post / Police Tips", target: "trip" },
+  { value: "Loan EMI", label: "Loan EMI", target: "loan" },
+  { value: "Driver Salary", label: "Driver Salary", target: "driver" },
+  { value: "Driver Batta", label: "Driver Batta", target: "driver", hasDeductionSource: true },
+  { value: "Trip Allowance", label: "Trip Allowance", target: "trip" },
+  { value: "Vehicle Maintenance", label: "Vehicle Maintenance", target: "vehicle" },
+  { value: "AdBlue", label: "AdBlue", target: "trip" },
+];
+
+const PAY_IN_CATEGORIES = [
+  { value: "Party Receipt", label: "Party Receipt" },
+  { value: "Trip Advance", label: "Trip Advance" },
+  { value: "Owner Credit / Loan", label: "Owner Credit / Personal Loan" },
+];
+
+const PAY_OUT_CATEGORIES = [
+  { value: "Commission Agent", label: "Broker / Commission Agent", payeeSource: "agents" },
+  { value: "Direct Party / Vendor", label: "Direct Party / Vendor", payeeSource: "parties" },
+];
 
 const getValidTime = (value) => {
   if (!value) return 0;
@@ -31,7 +58,15 @@ const getTransactionSortTime = (transaction = {}) => {
 function TransactionList() {
   const [transactions, setTransactions] = useState([]);
   const [accounts, setAccounts] = useState([]);
+  const [parties, setParties] = useState([]);
+  const [agents, setAgents] = useState([]);
+  const [drivers, setDrivers] = useState([]);
+  const [bookings, setBookings] = useState([]);
+  const [vehicles, setVehicles] = useState([]);
+  const [loans, setLoans] = useState([]);
+  const [submissions, setSubmissions] = useState([]);
   const [selectedAccount, setSelectedAccount] = useState("All");
+  const [selectedCategoryFilter, setSelectedCategoryFilter] = useState("All");
   const [filterMonth, setFilterMonth] = useState(getCurrentMonthValue());
   const [loading, setLoading] = useState(true);
   const [companySettings, setCompanySettings] = useState({});
@@ -42,15 +77,29 @@ function TransactionList() {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        // Fetch Accounts for the dropdown filter
-        const accSnap = await getDocs(collection(db, "accounts"));
+        const [accSnap, trxSnap, partySnap, agentSnap, driverSnap, bookingSnap, vehicleSnap, loanSnap, subSnap] =
+          await Promise.all([
+            getDocs(collection(db, "accounts")),
+            getDocs(collection(db, "transactions")),
+            getDocs(collection(db, "parties")),
+            getDocs(collection(db, "agents")),
+            getDocs(collection(db, "drivers")),
+            getDocs(collection(db, "bookings")),
+            getDocs(collection(db, "vehicles")),
+            getDocs(collection(db, "loans")),
+            getDocs(collection(db, "driver_submissions")),
+          ]);
+
         setAccounts(accSnap.docs.map(d => ({ id: d.id, ...d.data() })));
-
-        // Fetch Transactions
-        const trxSnap = await getDocs(collection(db, "transactions"));
         setTransactions(trxSnap.docs.map(d => ({ id: d.id, ...d.data() })));
+        setParties(partySnap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => (a.name || "").localeCompare(b.name || "")));
+        setAgents(agentSnap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => (a.name || "").localeCompare(b.name || "")));
+        setDrivers(driverSnap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => (a.name || "").localeCompare(b.name || "")));
+        setBookings(bookingSnap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => new Date(b.loadingDate || b.createdAt || 0) - new Date(a.loadingDate || a.createdAt || 0)));
+        setVehicles(vehicleSnap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => (a.number || "").localeCompare(b.number || "")));
+        setLoans(loanSnap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => (a.loanName || "").localeCompare(b.loanName || "")));
+        setSubmissions(subSnap.docs.map(d => ({ id: d.id, ...d.data() })));
 
-        // Fetch Company Settings
         setCompanySettings(await fetchCompanyProfile(db));
       } catch (error) {
         console.error("Error fetching ledger:", error);
@@ -61,7 +110,7 @@ function TransactionList() {
     fetchData();
   }, []);
 
-  // Filter transactions based on selected account
+  // Filter transactions based on selected account, month, and category
   const filteredTrx = transactions.filter((transaction) => {
     const accountMatches =
       selectedAccount === "All" ||
@@ -69,8 +118,9 @@ function TransactionList() {
       transaction.paymentMode === selectedAccount;
     const dateValue = getRecordDateInput(transaction, ["date", "createdAt"]);
     const monthMatches = !filterMonth || dateValue.startsWith(filterMonth);
+    const categoryMatches = selectedCategoryFilter === "All" || transaction.category === selectedCategoryFilter;
 
-    return accountMatches && monthMatches;
+    return accountMatches && monthMatches && categoryMatches;
   });
 
   // 🔥 CORE ENGINE: Calculate Running Balance based on IN and OUT/EXPENSE
@@ -147,9 +197,18 @@ function TransactionList() {
         paymentAccount: transaction.paymentAccount || transaction.paymentMode || "",
         referenceNo: transaction.referenceNo || "",
         partyName: transaction.partyName || "",
+        partyId: transaction.partyId || "",
         payeeName: transaction.payeeName || "",
+        payeeId: transaction.payeeId || "",
         payee: transaction.payee || "",
         targetName: transaction.targetName || "",
+        driverName: transaction.driverName || "",
+        bookingId: transaction.bookingId || "",
+        bookingTrackingId: transaction.bookingTrackingId || transaction.trackingId || "",
+        bookingLrNumber: transaction.bookingLrNumber || transaction.lrNumber || "",
+        vehicleNumber: transaction.vehicleNumber || "",
+        loanId: transaction.loanId || "",
+        deductionSource: transaction.deductionSource || "admin_account",
         notes: transaction.notes || "",
       },
     });
@@ -161,6 +220,122 @@ function TransactionList() {
       form: {
         ...prev.form,
         [field]: value,
+      },
+    }));
+  };
+
+  const updateEditType = (type) => {
+    const defaultCategory =
+      type === "IN"
+        ? "Party Receipt"
+        : type === "OUT"
+          ? "Commission Agent"
+          : "Petrol";
+
+    setEditModal((prev) => ({
+      ...prev,
+      form: {
+        ...prev.form,
+        type,
+        category: defaultCategory,
+        partyId: "",
+        partyName: "",
+        payeeId: "",
+        payeeName: "",
+        payee: "",
+        targetName: "",
+        driverName: "",
+        bookingId: "",
+        bookingTrackingId: "",
+        bookingLrNumber: "",
+        vehicleNumber: "",
+        loanId: "",
+      },
+    }));
+  };
+
+  const updateEditCategory = (category) => {
+    const expenseCategory = EXPENSE_CATEGORIES.find((item) => item.value === category);
+    setEditModal((prev) => ({
+      ...prev,
+      form: {
+        ...prev.form,
+        category,
+        targetName: expenseCategory?.target === "office" ? "Office / Admin" : "",
+        driverName: "",
+        payeeName: "",
+        payee: "",
+        bookingId: "",
+        bookingTrackingId: "",
+        bookingLrNumber: "",
+        vehicleNumber: "",
+        loanId: "",
+      },
+    }));
+  };
+
+  const updateEditParty = (partyId) => {
+    const party = parties.find((item) => item.id === partyId);
+    setEditModal((prev) => ({
+      ...prev,
+      form: {
+        ...prev.form,
+        partyId,
+        partyName: party?.name || "",
+      },
+    }));
+  };
+
+  const updateEditPayee = (payeeId, source) => {
+    const payeeList = source === "agents" ? agents : parties;
+    const payee = payeeList.find((item) => item.id === payeeId);
+    setEditModal((prev) => ({
+      ...prev,
+      form: {
+        ...prev.form,
+        payeeId,
+        payeeName: payee?.name || "",
+        payee: payee?.name || "",
+      },
+    }));
+  };
+
+  const updateEditBooking = (bookingId) => {
+    const booking = bookings.find((item) => item.id === bookingId);
+    setEditModal((prev) => ({
+      ...prev,
+      form: {
+        ...prev.form,
+        bookingId,
+        bookingTrackingId: booking?.trackingId || "",
+        bookingLrNumber: booking?.lrNumber || "",
+        vehicleNumber: booking?.vehicle || "",
+        targetName: booking ? `${booking.trackingId || booking.id} - ${booking.from || ""} to ${booking.to || ""}` : "",
+      },
+    }));
+  };
+
+  const updateEditDriver = (driverName) => {
+    setEditModal((prev) => ({
+      ...prev,
+      form: {
+        ...prev.form,
+        driverName,
+        payeeName: driverName,
+        payee: driverName,
+        targetName: driverName,
+      },
+    }));
+  };
+
+  const updateEditLoan = (loanId) => {
+    const loan = loans.find((item) => item.id === loanId);
+    setEditModal((prev) => ({
+      ...prev,
+      form: {
+        ...prev.form,
+        loanId,
+        targetName: loan?.loanName || "",
       },
     }));
   };
@@ -179,9 +354,26 @@ function TransactionList() {
 
     setIsSavingEdit(true);
     try {
+      const form = editModal.form;
+      const isPaymentIn = form.type === "IN";
+      const isPaymentOut = form.type === "OUT";
+      const isExpense = form.type === "EXPENSE";
+      const isDriverExpense =
+        isExpense && ["Driver Salary", "Driver Batta"].includes(form.category);
+      const usesOwnerAccount = true;
+
       const payload = {
-        ...editModal.form,
+        ...form,
         amount,
+        paymentAccount: usesOwnerAccount ? form.paymentAccount || "" : "",
+        paymentMode: usesOwnerAccount ? form.paymentAccount || "" : "",
+        partyName: isPaymentIn ? form.partyName || "" : "",
+        payeeName:
+          isPaymentOut || isDriverExpense ? form.payeeName || form.driverName || form.targetName || "" : "",
+        payee:
+          isPaymentOut || isDriverExpense ? form.payee || form.payeeName || form.driverName || form.targetName || "" : "",
+        driverName: isDriverExpense ? form.driverName || form.payeeName || form.targetName || "" : form.driverName || "",
+        deductionSource: isExpense ? form.deductionSource || "admin_account" : "",
         updatedAt: new Date().toISOString(),
       };
 
@@ -231,6 +423,20 @@ function TransactionList() {
     }
   };
 
+  const editForm = editModal.form || {};
+  const editType = editForm.type || "EXPENSE";
+  const editExpenseCategory = EXPENSE_CATEGORIES.find((item) => item.value === editForm.category);
+  const editPayOutCategory = PAY_OUT_CATEGORIES.find((item) => item.value === editForm.category) || PAY_OUT_CATEGORIES[0];
+  const editPayees = editPayOutCategory.payeeSource === "agents" ? agents : parties;
+  const editNeedsTrip = editType === "EXPENSE" && editExpenseCategory?.target === "trip";
+  const editNeedsDriver = editType === "EXPENSE" && editExpenseCategory?.target === "driver";
+  const editNeedsVehicle = editType === "EXPENSE" && editExpenseCategory?.target === "vehicle";
+  const editNeedsLoan = editType === "EXPENSE" && editExpenseCategory?.target === "loan";
+  const editNeedsDeduction =
+    editType === "EXPENSE" &&
+    (editExpenseCategory?.hasDeductionSource || editForm.deductionSource === "driver_salary");
+  const editUsesOwnerAccount = true;
+
   return (
     <div className="list-page-bg">
       <Navbar />
@@ -243,17 +449,41 @@ function TransactionList() {
             <small style={{ color: "#64748b" }}>Current month is selected by default. Clear the month to view all records.</small>
           </div>
           
-          <div style={{ display: "grid", gap: "10px", minWidth: "260px" }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: "10px" }}>
           <div className="search-box">
             <select 
               value={selectedAccount} 
               onChange={(e) => setSelectedAccount(e.target.value)}
               style={{ width: "100%", padding: "0.8rem", borderRadius: "8px", border: "1px solid #cbd5e1", outline: "none" }}
             >
-              <option value="All">All Transactions</option>
+              <option value="All">All Accounts</option>
               {accounts.map(acc => (
                 <option key={acc.id} value={acc.accountName}>{acc.accountName}</option>
               ))}
+            </select>
+          </div>
+          <div className="search-box">
+            <select 
+              value={selectedCategoryFilter} 
+              onChange={(e) => setSelectedCategoryFilter(e.target.value)}
+              style={{ width: "100%", padding: "0.8rem", borderRadius: "8px", border: "1px solid #cbd5e1", outline: "none" }}
+            >
+              <option value="All">All Categories</option>
+              <optgroup label="Expense Categories">
+                {EXPENSE_CATEGORIES.map(cat => (
+                  <option key={cat.value} value={cat.value}>{cat.label}</option>
+                ))}
+              </optgroup>
+              <optgroup label="Pay IN Categories">
+                {PAY_IN_CATEGORIES.map(cat => (
+                  <option key={cat.value} value={cat.value}>{cat.label}</option>
+                ))}
+              </optgroup>
+              <optgroup label="Pay OUT Categories">
+                {PAY_OUT_CATEGORIES.map(cat => (
+                  <option key={cat.value} value={cat.value}>{cat.label}</option>
+                ))}
+              </optgroup>
             </select>
           </div>
           <div className="search-box">
@@ -421,9 +651,9 @@ function TransactionList() {
               </div>
               <div>
                 <label>Type</label>
-                <select className="modal-input" value={editModal.form.type || "EXPENSE"} onChange={(e) => updateEditField("type", e.target.value)}>
-                  <option value="IN">IN / Credit</option>
-                  <option value="OUT">OUT / Debit</option>
+                <select className="modal-input" value={editType} onChange={(e) => updateEditType(e.target.value)}>
+                  <option value="IN">Payment In / Credit</option>
+                  <option value="OUT">Payment Out / Debit</option>
                   <option value="EXPENSE">Expense</option>
                   <option value="TRANSFER_IN">Transfer In</option>
                   <option value="TRANSFER_OUT">Transfer Out</option>
@@ -431,37 +661,198 @@ function TransactionList() {
               </div>
               <div>
                 <label>Category</label>
-                <input className="modal-input" value={editModal.form.category || ""} onChange={(e) => updateEditField("category", e.target.value)} />
+                {editType === "IN" ? (
+                  <select className="modal-input" value={editForm.category || "Party Receipt"} onChange={(e) => updateEditCategory(e.target.value)}>
+                    {PAY_IN_CATEGORIES.map((category) => (
+                      <option key={category.value} value={category.value}>{category.label}</option>
+                    ))}
+                  </select>
+                ) : editType === "OUT" ? (
+                  <select className="modal-input" value={editForm.category || "Commission Agent"} onChange={(e) => updateEditCategory(e.target.value)}>
+                    {PAY_OUT_CATEGORIES.map((category) => (
+                      <option key={category.value} value={category.value}>{category.label}</option>
+                    ))}
+                  </select>
+                ) : editType === "EXPENSE" ? (
+                  <select className="modal-input" value={editForm.category || "Petrol"} onChange={(e) => updateEditCategory(e.target.value)}>
+                    {EXPENSE_CATEGORIES.map((category) => (
+                      <option key={category.value} value={category.value}>{category.label}</option>
+                    ))}
+                  </select>
+                ) : (
+                  <input className="modal-input" value={editForm.category || ""} onChange={(e) => updateEditField("category", e.target.value)} />
+                )}
               </div>
               <div>
                 <label>Amount</label>
                 <input type="number" className="modal-input" value={editModal.form.amount || ""} onChange={(e) => updateEditField("amount", e.target.value)} />
               </div>
-              <div>
-                <label>Account Used</label>
-                <select className="modal-input" value={editModal.form.paymentAccount || ""} onChange={(e) => updateEditField("paymentAccount", e.target.value)}>
-                  <option value="">-- Select Account --</option>
-                  {accounts.map((account) => (
-                    <option key={account.id} value={account.accountName}>{account.accountName}</option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label>Party Name</label>
-                <input className="modal-input" value={editModal.form.partyName || ""} onChange={(e) => updateEditField("partyName", e.target.value)} />
-              </div>
-              <div>
-                <label>Payee Name</label>
-                <input className="modal-input" value={editModal.form.payeeName || ""} onChange={(e) => updateEditField("payeeName", e.target.value)} />
-              </div>
-              <div>
-                <label>Payee</label>
-                <input className="modal-input" value={editModal.form.payee || ""} onChange={(e) => updateEditField("payee", e.target.value)} />
-              </div>
-              <div>
-                <label>Target / Vehicle / Driver</label>
-                <input className="modal-input" value={editModal.form.targetName || ""} onChange={(e) => updateEditField("targetName", e.target.value)} />
-              </div>
+
+              {editType === "IN" && (
+                <>
+                  <div className="full-width">
+                    <label>Received From (Party / Customer)</label>
+                    <select className="modal-input" value={editForm.partyId || ""} onChange={(e) => updateEditParty(e.target.value)}>
+                      <option value="">-- Select Party --</option>
+                      {parties.map((party) => (
+                        <option key={party.id} value={party.id}>{party.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="full-width">
+                    <label>Link With Booking / LR</label>
+                    <select className="modal-input" value={editForm.bookingId || ""} onChange={(e) => updateEditBooking(e.target.value)}>
+                      <option value="">-- Keep as general receipt --</option>
+                      {bookings.map((booking) => (
+                        <option key={booking.id} value={booking.id}>
+                          {booking.trackingId || booking.id} | {booking.party || "-"} | {booking.vehicle || "-"} | {booking.from || "-"} to {booking.to || "-"}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </>
+              )}
+
+              {editType === "OUT" && (
+                <>
+                  <div className="full-width">
+                    <label>Paid To</label>
+                    <select className="modal-input" value={editForm.payeeId || ""} onChange={(e) => updateEditPayee(e.target.value, editPayOutCategory.payeeSource)}>
+                      <option value="">-- Select Payee --</option>
+                      {editPayees.map((payee) => (
+                        <option key={payee.id} value={payee.id}>{payee.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                  {editPayOutCategory.payeeSource === "agents" && (
+                    <div className="full-width">
+                      <label>Link With Booking / LR</label>
+                      <select className="modal-input" value={editForm.bookingId || ""} onChange={(e) => updateEditBooking(e.target.value)}>
+                        <option value="">-- Keep as general payout --</option>
+                        {bookings.map((booking) => (
+                          <option key={booking.id} value={booking.id}>
+                            {booking.trackingId || booking.id} | {booking.agent || "-"} | {booking.vehicle || "-"} | {booking.from || "-"} to {booking.to || "-"}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+                </>
+              )}
+
+              {editNeedsTrip && (
+                <div className="full-width">
+                  <label>Trip</label>
+                  <select className="modal-input" value={editForm.bookingId || ""} onChange={(e) => updateEditBooking(e.target.value)}>
+                    <option value="">-- Select Trip --</option>
+                    {bookings.map((booking) => (
+                      <option key={booking.id} value={booking.id}>
+                        {booking.trackingId || booking.id} | {booking.vehicle || "-"} | {booking.from || "-"} to {booking.to || "-"}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              {editNeedsDriver && (
+                <div>
+                  <label>Driver</label>
+                  <select className="modal-input" value={editForm.driverName || editForm.payeeName || ""} onChange={(e) => updateEditDriver(e.target.value)}>
+                    <option value="">-- Select Driver --</option>
+                    {drivers.map((driver) => (
+                      <option key={driver.id} value={driver.name}>{driver.name}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              {editNeedsVehicle && (
+                <div>
+                  <label>Vehicle</label>
+                  <select className="modal-input" value={editForm.targetName || editForm.vehicleNumber || ""} onChange={(e) => updateEditField("targetName", e.target.value)}>
+                    <option value="">-- Select Vehicle --</option>
+                    {vehicles.map((vehicle) => (
+                      <option key={vehicle.id} value={vehicle.number}>{vehicle.number}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              {editNeedsLoan && (
+                <div>
+                  <label>Loan</label>
+                  <select className="modal-input" value={editForm.loanId || ""} onChange={(e) => updateEditLoan(e.target.value)}>
+                    <option value="">-- Select Loan --</option>
+                    {loans.map((loan) => (
+                      <option key={loan.id} value={loan.id}>{loan.loanName}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              {editNeedsDeduction && (
+                <div>
+                  <label>Deduct From</label>
+                  <select className="modal-input" value={editForm.deductionSource || "admin_account"} onChange={(e) => updateEditField("deductionSource", e.target.value)}>
+                    <option value="admin_account">Owner Account</option>
+                    <option value="driver_salary">Deduct From Driver Commission</option>
+                  </select>
+                </div>
+              )}
+
+              {(editForm.deductionSource === "driver_salary" || editForm.category === "Driver Salary") && (
+                (() => {
+                  const targetDriverName = editForm.driverName || editForm.payeeName || editForm.targetName;
+                  const salaryMonth = (editForm.date || new Date().toISOString()).slice(0, 7);
+                  const selectedDriver = drivers.find((d) => d.name === targetDriverName);
+                  if (!selectedDriver) return null;
+
+                  const salarySummary = getDriverMonthSummary(selectedDriver, salaryMonth, bookings, transactions, submissions);
+                  const carriedUntilThisMonth = getDriverCarryForwardToMonth(selectedDriver, salaryMonth, bookings, transactions, submissions);
+                  const previousCarryForward = carriedUntilThisMonth - salarySummary.remainingThisMonth;
+                  const salaryBalanceBeforePayment = previousCarryForward + salarySummary.remainingThisMonth;
+                  const salaryBalanceAfterPayment = salaryBalanceBeforePayment - Number(editForm.amount || 0);
+
+                  return (
+                    <div className="full-width" style={{ background: "#eff6ff", border: "1px solid #bfdbfe", borderRadius: "8px", padding: "12px", marginTop: "10px", marginBottom: "10px" }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "8px" }}>
+                        <strong style={{ color: "#1e40af", fontSize: "0.85rem" }}>{targetDriverName} Balance Impact</strong>
+                        <span style={{ color: "#64748b", fontWeight: "bold", fontSize: "0.85rem" }}>{salaryMonth}</span>
+                      </div>
+                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px", fontSize: "0.85rem" }}>
+                        <div style={{ background: "white", padding: "6px", borderRadius: "6px", border: "1px solid #dbeafe" }}>
+                          <small style={{ color: "#64748b", display: "block" }}>BEFORE</small>
+                          <strong style={{ color: salaryBalanceBeforePayment < 0 ? "#b91c1c" : "#0f172a" }}>Rs {Math.round(salaryBalanceBeforePayment).toLocaleString("en-IN")}</strong>
+                        </div>
+                        <div style={{ background: "white", padding: "6px", borderRadius: "6px", border: "1px solid #dbeafe" }}>
+                          <small style={{ color: "#64748b", display: "block" }}>AFTER DEDUCT</small>
+                          <strong style={{ color: salaryBalanceAfterPayment < 0 ? "#b91c1c" : "#0f172a" }}>Rs {Math.round(salaryBalanceAfterPayment).toLocaleString("en-IN")}</strong>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })()
+              )}
+
+              {editUsesOwnerAccount && (
+                <div>
+                  <label>{editType === "IN" ? "Deposited Into" : "Account Used"}</label>
+                  <select className="modal-input" value={editForm.paymentAccount || ""} onChange={(e) => updateEditField("paymentAccount", e.target.value)}>
+                    <option value="">-- Select Account --</option>
+                    {accounts.map((account) => (
+                      <option key={account.id} value={account.accountName}>{account.accountName}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              {editType === "EXPENSE" && !editNeedsTrip && !editNeedsDriver && !editNeedsVehicle && !editNeedsLoan && (
+                <div>
+                  <label>Applied To</label>
+                  <input className="modal-input" value={editForm.targetName || ""} onChange={(e) => updateEditField("targetName", e.target.value)} />
+                </div>
+              )}
+
               <div>
                 <label>Reference No.</label>
                 <input className="modal-input" value={editModal.form.referenceNo || ""} onChange={(e) => updateEditField("referenceNo", e.target.value)} />

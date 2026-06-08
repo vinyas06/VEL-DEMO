@@ -18,6 +18,7 @@ const EXPENSE_CATEGORIES = [
   { value: "Check Post Police Tips", label: "Check Post / Police Tips", target: "trip" },
   { value: "Loan EMI", label: "Loan EMI", target: "loan" },
   { value: "Driver Salary", label: "Driver Salary", target: "driver" },
+  { value: "Driver Batta", label: "Driver Batta", target: "driver", hasDeductionSource: true },
   { value: "Trip Allowance", label: "Trip Allowance", target: "trip" },
   { value: "Vehicle Maintenance", label: "Vehicle Maintenance", target: "vehicle" },
   { value: "AdBlue", label: "AdBlue", target: "trip" },
@@ -48,6 +49,7 @@ function AddExpense() {
     amount: "",
     paymentAccount: "",
     notes: "",
+    deductionSource: "admin_account",
     type: "EXPENSE",
   });
 
@@ -114,6 +116,7 @@ function AddExpense() {
       vehicleNumber: "",
       loanId: "",
       amount: "",
+      deductionSource: "admin_account",
     }));
   };
 
@@ -144,12 +147,13 @@ function AddExpense() {
 
   const salaryMonth = form.date.slice(0, 7);
   const selectedDriver = drivers.find((driver) => driver.name === form.targetName);
+  const needsSalarySummary = form.category === "Driver Salary" || form.deductionSource === "driver_salary";
   const salarySummary =
-    form.category === "Driver Salary" && selectedDriver
+    needsSalarySummary && selectedDriver
       ? getDriverMonthSummary(selectedDriver, salaryMonth, bookings, transactions, submissions)
       : null;
   const carriedUntilThisMonth =
-    form.category === "Driver Salary" && selectedDriver
+    needsSalarySummary && selectedDriver
       ? getDriverCarryForwardToMonth(selectedDriver, salaryMonth, bookings, transactions, submissions)
       : 0;
   const previousCarryForward = salarySummary
@@ -185,9 +189,10 @@ function AddExpense() {
         payee: form.category === "Driver Salary" ? form.targetName : "",
         driverName: form.category === "Driver Salary" ? form.targetName : "",
         salaryMonth: form.category === "Driver Salary" ? salaryMonth : "",
-        salaryBalanceBefore: form.category === "Driver Salary" ? salaryBalanceBeforePayment : "",
-        salaryBalanceAfter: form.category === "Driver Salary" ? salaryBalanceAfterPayment : "",
+        salaryBalanceBefore: needsSalarySummary ? salaryBalanceBeforePayment : "",
+        salaryBalanceAfter: needsSalarySummary ? salaryBalanceAfterPayment : "",
         loanId: needsLoan ? form.loanId : "",
+        deductionSource: form.deductionSource,
         amount: Number(form.amount),
         createdAt: new Date().toISOString(),
         attachments,
@@ -214,6 +219,7 @@ function AddExpense() {
         amount: "",
         paymentAccount: "",
         notes: "",
+        deductionSource: "admin_account",
       });
       setAttachmentFiles([]);
     } catch (error) {
@@ -300,6 +306,16 @@ function AddExpense() {
                     {loan.loanName} | EMI Rs {Number(loan.monthlyEmi || 0).toLocaleString("en-IN")}
                   </option>
                 ))}
+              </select>
+            </div>
+          )}
+
+          {selectedCategory.hasDeductionSource && (
+            <div className="input-group">
+              <label>Deduct From *</label>
+              <select name="deductionSource" value={form.deductionSource} onChange={handleChange} style={{ borderColor: "#f97316" }}>
+                <option value="admin_account">Owner Account / Driver Advance</option>
+                <option value="driver_salary">Deduct From Driver Commission</option>
               </select>
             </div>
           )}
