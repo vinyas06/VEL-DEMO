@@ -20,6 +20,7 @@ function DriverSalaryLedger() {
   const [bookings, setBookings] = useState([]);
   const [transactions, setTransactions] = useState([]);
   const [submissions, setSubmissions] = useState([]);
+  const [odoLogs, setOdoLogs] = useState([]);
   const [selectedMonth, setSelectedMonth] = useState(getCurrentMonthValue());
   const [selectedDriver, setSelectedDriver] = useState("All");
   const [loading, setLoading] = useState(true);
@@ -38,12 +39,16 @@ function DriverSalaryLedger() {
     const unsubSubmissions = onSnapshot(collection(db, "driver_submissions"), (snap) => {
       setSubmissions(snap.docs.map(d => ({ id: d.id, ...d.data() })));
     });
+    const unsubOdoLogs = onSnapshot(collection(db, "truck_odo_logs"), (snap) => {
+      setOdoLogs(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    });
 
     return () => {
       unsubDrivers();
       unsubBookings();
       unsubTransactions();
       unsubSubmissions();
+      unsubOdoLogs();
     };
   }, []);
 
@@ -51,8 +56,8 @@ function DriverSalaryLedger() {
     return drivers
       .filter((driver) => selectedDriver === "All" || driver.name === selectedDriver)
       .map((driver) => {
-        const monthSummary = getDriverMonthSummary(driver, selectedMonth, bookings, transactions, submissions);
-        const carryForward = getDriverCarryForwardToMonth(driver, selectedMonth, bookings, transactions, submissions);
+        const monthSummary = getDriverMonthSummary(driver, selectedMonth, bookings, transactions, submissions, odoLogs);
+        const carryForward = getDriverCarryForwardToMonth(driver, selectedMonth, bookings, transactions, submissions, odoLogs);
         const previousCarryForward = carryForward - monthSummary.remainingThisMonth;
 
         return {
@@ -62,16 +67,17 @@ function DriverSalaryLedger() {
           carryForward,
         };
       });
-  }, [bookings, drivers, selectedDriver, selectedMonth, submissions, transactions]);
+  }, [bookings, drivers, selectedDriver, selectedMonth, submissions, transactions, odoLogs]);
 
   const totals = rows.reduce(
     (sum, row) => ({
       grossPayable: sum.grossPayable + row.grossPayable,
       commissionEarned: sum.commissionEarned + row.commissionEarned,
+      distanceEarned: sum.distanceEarned + (row.distanceEarnings || 0),
       paidSalary: sum.paidSalary + row.paidSalary,
       carryForward: sum.carryForward + row.carryForward,
     }),
-    { grossPayable: 0, commissionEarned: 0, paidSalary: 0, carryForward: 0 }
+    { grossPayable: 0, commissionEarned: 0, distanceEarned: 0, paidSalary: 0, carryForward: 0 }
   );
 
   const driverTransactions = transactions
@@ -169,6 +175,7 @@ function DriverSalaryLedger() {
           {[
             ["Gross Salary", totals.grossPayable, "#1d4ed8"],
             ["Commission", totals.commissionEarned, "#0f766e"],
+            ["KM Earnings", totals.distanceEarned, "#4f46e5"],
             ["Paid This Month", totals.paidSalary, "#b45309"],
             ["Carry Forward", totals.carryForward, totals.carryForward < 0 ? "#b91c1c" : "#166534"],
           ].map(([label, value, color]) => (
@@ -193,6 +200,7 @@ function DriverSalaryLedger() {
                     <th style={{ padding: "1rem" }}>Trips</th>
                     <th style={{ padding: "1rem" }}>Fixed</th>
                     <th style={{ padding: "1rem" }}>Commission</th>
+                    <th style={{ padding: "1rem" }}>KM Earnings</th>
                     <th style={{ padding: "1rem" }}>Deductions</th>
                     <th style={{ padding: "1rem" }}>Prev. Carry</th>
                     <th style={{ padding: "1rem" }}>Paid</th>
@@ -206,6 +214,11 @@ function DriverSalaryLedger() {
                       <td style={{ padding: "1rem" }}>{row.tripCount}</td>
                       <td style={{ padding: "1rem" }}>Rs {formatMoney(row.fixedSalary)}</td>
                       <td style={{ padding: "1rem" }}>Rs {formatMoney(row.commissionEarned)}</td>
+                      <td style={{ padding: "1rem" }}>
+                        {row.salaryType === "fixed_km" ? (
+                           <>Rs {formatMoney(row.distanceEarnings)} <br/><small style={{color: "#64748b"}}>{row.totalKmDriven} km @ {row.kmRate}/km</small></>
+                        ) : "-"}
+                      </td>
                       <td style={{ padding: "1rem", color: "#b91c1c" }}>Rs {formatMoney(row.totalDeductions)}</td>
                       <td style={{ padding: "1rem" }}>Rs {formatMoney(row.previousCarryForward)}</td>
                       <td style={{ padding: "1rem", color: "#b45309", fontWeight: "800" }}>Rs {formatMoney(row.paidSalary)}</td>

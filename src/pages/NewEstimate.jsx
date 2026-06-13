@@ -7,7 +7,6 @@ import { Calculator, MapPin, Navigation, Box, FileText, Truck, Users } from "luc
 import { logActivity } from "../utils/activityLog";
 import "./AddDriver.css"; // Reuse your excellent CSS
 
-const API_KEY = "278f06ea43474a83be95b023b58a1a39"; 
 const generateEstimateId = () => `EST-${Math.floor(10000 + Math.random() * 90000)}`;
 const sanitizeDecimalInput = (value) => value.replace(/[^\d.]/g, "").replace(/(\..*)\./g, "$1");
 
@@ -61,7 +60,7 @@ function NewEstimate() {
     setForm((prev) => ({ ...prev, [type]: text }));
     if (text.length < 3) return; 
     try {
-      const res = await fetch(`https://api.geoapify.com/v1/geocode/autocomplete?text=${text}&limit=5&apiKey=${API_KEY}`);
+      const res = await fetch(`https://api.geoapify.com/v1/geocode/autocomplete?text=${text}&limit=5&apiKey=${import.meta.env.VITE_GEOAPIFY_API_KEY || "278f06ea43474a83be95b023b58a1a39"}`);
       const data = await res.json();
       if (type === "from") setFromOptions(data.features || []);
       else setToOptions(data.features || []);

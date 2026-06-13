@@ -5,13 +5,13 @@ import { getAnalytics } from "firebase/analytics";
 import { initializeAppCheck, ReCaptchaEnterpriseProvider } from "firebase/app-check";
 
 const firebaseConfig = {
-  apiKey: "AIzaSyC47xZb_sfiq6ZZgdfNHPIGjwNPb2YFdn0",
-  authDomain: "veerashiava-express-logistics.firebaseapp.com",
-  projectId: "veerashiava-express-logistics",
-  storageBucket: "veerashiava-express-logistics.firebasestorage.app",
-  messagingSenderId: "1062301466907",
-  appId: "1:1062301466907:web:75cd22040c099c52ce13be",
-  measurementId: "G-RLQT2RC01N"
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+  appId: import.meta.env.VITE_FIREBASE_APP_ID,
+  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID
 };
 
 const app = initializeApp(firebaseConfig);
@@ -19,7 +19,7 @@ const analytics = getAnalytics(app);
 
 // 🔥 Initialize App Check Security Firewall
 const appCheck = initializeAppCheck(app, {
-  provider: new ReCaptchaEnterpriseProvider('6LcNdPosAAAAADU6FBJeu2X9otwmNdMHRA7XIcUU'),
+  provider: new ReCaptchaEnterpriseProvider(import.meta.env.VITE_FIREBASE_RECAPTCHA_KEY),
   isTokenAutoRefreshEnabled: true
 });
 

@@ -21,6 +21,8 @@ const buildInitialForm = () => ({
   salaryType: "fixed",
   salary: "",
   commissionRate: "",
+  kmRate: "",
+  salaryCalculationDate: new Date().toISOString().split("T")[0],
   status: "active",
 });
 
@@ -48,6 +50,8 @@ function AddDriver() {
         ...form,
         salary: Number(form.salary) || 0,
         commissionRate: Number(form.commissionRate) || 0,
+        kmRate: Number(form.kmRate) || 0,
+        salaryCalculationDate: form.salaryCalculationDate,
         createdAt: new Date().toISOString(),
       });
       await logActivity(db, {
@@ -185,20 +189,38 @@ function AddDriver() {
               <option value="fixed">Fixed Monthly Salary</option>
               <option value="commission">Commission % on Monthly Booking Amount</option>
               <option value="fixed_commission">Fixed Salary + Commission %</option>
+              <option value="fixed_km">Fixed Salary + Per KM Rate</option>
             </select>
           </div>
 
-          {form.salaryType !== "commission" && (
+          {(form.salaryType === "fixed_km") && (
+            <div className="input-group full-width" style={{ background: "#f8fafc", padding: "15px", borderRadius: "8px", border: "1px solid #e2e8f0", marginBottom: "15px" }}>
+              <label>Calculation Start Date (For Odometer KM Tracking)</label>
+              <input name="salaryCalculationDate" type="date" value={form.salaryCalculationDate} onChange={handleChange} />
+              <small style={{ color: "#64748b", marginTop: "5px", display: "block" }}>
+                KM readings submitted after this date will be counted towards this month's distance salary.
+              </small>
+            </div>
+          )}
+
+          {(form.salaryType === "fixed" || form.salaryType === "fixed_commission" || form.salaryType === "fixed_km") && (
             <div className="input-group">
               <label>Fixed Monthly Salary (Rs)</label>
               <input name="salary" type="number" placeholder="e.g., 20000" value={form.salary} onChange={handleChange} />
             </div>
           )}
 
-          {form.salaryType !== "fixed" && (
+          {(form.salaryType === "commission" || form.salaryType === "fixed_commission") && (
             <div className="input-group">
               <label>Commission Rate (%)</label>
               <input name="commissionRate" type="number" placeholder="e.g., 5" value={form.commissionRate} onChange={handleChange} />
+            </div>
+          )}
+
+          {form.salaryType === "fixed_km" && (
+            <div className="input-group">
+              <label>Per KM Rate (Rs)</label>
+              <input name="kmRate" type="number" placeholder="e.g., 2.5" value={form.kmRate} onChange={handleChange} />
             </div>
           )}
 

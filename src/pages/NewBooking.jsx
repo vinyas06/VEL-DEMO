@@ -10,7 +10,7 @@ import { logActivity } from "../utils/activityLog";
 import { sendCustomerNotification } from "../utils/portalAuth"; 
 import "./AddDriver.css"; 
 
-const API_KEY = "278f06ea43474a83be95b023b58a1a39"; 
+const generateLrNumber = () => `LR-${Math.floor(10000 + Math.random() * 90000)}`;
 const generate6DigitId = () => Math.floor(100000 + Math.random() * 900000).toString();
 const sanitizeDecimalInput = (value) => value.replace(/[^\d.]/g, "").replace(/(\..*)\./g, "$1");
 const getNextLrNumber = (bookings = []) => {
@@ -119,7 +119,7 @@ function NewBooking() {
     setForm((prev) => ({ ...prev, [type]: text }));
     if (text.length < 3) return; 
     try {
-      const res = await fetch(`https://api.geoapify.com/v1/geocode/autocomplete?text=${text}&limit=5&apiKey=${API_KEY}`);
+      const res = await fetch(`https://api.geoapify.com/v1/geocode/autocomplete?text=${text}&limit=5&apiKey=${import.meta.env.VITE_GEOAPIFY_API_KEY || "278f06ea43474a83be95b023b58a1a39"}`);
       const data = await res.json();
       if (type === "from") setFromOptions(data.features || []);
       else setToOptions(data.features || []);
@@ -407,13 +407,7 @@ function NewBooking() {
           <div className="input-group" style={{ position: "relative" }}>
             <label>From (Loading Point) *</label>
             <input placeholder="Start typing city..." value={form.from} onChange={(e) => handleLocationSearch(e.target.value, "from")} autoComplete="off" />
-            {fromOptions.length > 0 && (
-              <ul className="autocomplete-list">
-                {fromOptions.map((f, i) => (
-                  <li key={i} onClick={() => handleSelectLocation(f, "from")}><MapPin size={14}/> {f.properties.formatted}</li>
-                ))}
-              </ul>
-            )}
+            {fromOptions.length > 0 && <ul className="autocomplete-list">{fromOptions.map((f, i) => <li key={i} onClick={() => handleSelectLocation(f, "from")}><MapPin size={14}/> {f.properties.formatted}</li>)}</ul>}
           </div>
 
           <div className="input-group">
@@ -424,13 +418,7 @@ function NewBooking() {
           <div className="input-group" style={{ position: "relative" }}>
             <label>To (Unloading Point) *</label>
             <input placeholder="Start typing city..." value={form.to} onChange={(e) => handleLocationSearch(e.target.value, "to")} autoComplete="off" />
-            {toOptions.length > 0 && (
-              <ul className="autocomplete-list">
-                {toOptions.map((f, i) => (
-                  <li key={i} onClick={() => handleSelectLocation(f, "to")}><MapPin size={14}/> {f.properties.formatted}</li>
-                ))}
-              </ul>
-            )}
+            {toOptions.length > 0 && <ul className="autocomplete-list">{toOptions.map((f, i) => <li key={i} onClick={() => handleSelectLocation(f, "to")}><MapPin size={14}/> {f.properties.formatted}</li>)}</ul>}
           </div>
 
           <div className="input-group">

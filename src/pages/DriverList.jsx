@@ -18,6 +18,10 @@ const getSalaryTypeLabel = (driver = {}) => {
     }%`;
   }
 
+  if (driver.salaryType === "fixed_km") {
+    return `Fixed + KM: Rs ${Number(driver.salary || 0).toLocaleString("en-IN")} + Rs ${driver.kmRate || 0}/KM`;
+  }
+
   return `Fixed Salary: Rs ${Number(driver.salary || 0).toLocaleString("en-IN")} / month`;
 };
 
@@ -75,12 +79,20 @@ function DriverList() {
       const updatePayload = { ...selected };
       if (updatePayload.salaryType === "commission") {
         updatePayload.salary = ""; // Clear fixed salary
+        updatePayload.kmRate = "";
       } else if (updatePayload.salaryType === "fixed" || !updatePayload.salaryType) {
         updatePayload.commissionRate = ""; // Clear commission rate
+        updatePayload.kmRate = "";
+      } else if (updatePayload.salaryType === "fixed_km") {
+        updatePayload.commissionRate = "";
+      } else if (updatePayload.salaryType === "fixed_commission") {
+        updatePayload.kmRate = "";
       }
       updatePayload.salary = updatePayload.salary === "" ? "" : Number(updatePayload.salary) || 0;
       updatePayload.commissionRate =
         updatePayload.commissionRate === "" ? "" : Number(updatePayload.commissionRate) || 0;
+      updatePayload.kmRate =
+        updatePayload.kmRate === "" ? "" : Number(updatePayload.kmRate) || 0;
 
       await updateDoc(doc(db, "drivers", selected.id), updatePayload);
       await logActivity(db, {
@@ -284,10 +296,22 @@ function DriverList() {
                       <option value="fixed">Fixed Monthly Salary</option>
                       <option value="commission">Commission Based (% of Booking)</option>
                       <option value="fixed_commission">Fixed Salary + Commission %</option>
+                      <option value="fixed_km">Fixed Salary + Per KM Rate</option>
                     </select>
                   </div>
 
-                  {(selected.salaryType === "fixed" || selected.salaryType === "fixed_commission" || !selected.salaryType) && (
+                  {(selected.salaryType === "fixed_km") && (
+                    <div className="input-group full-width" style={{ background: "#f8fafc", padding: "10px", borderRadius: "8px", border: "1px solid #e2e8f0" }}>
+                      <label>Calculation Start Date</label>
+                      <input 
+                        type="date" 
+                        value={selected.salaryCalculationDate || ""} 
+                        onChange={(e) => setSelected({ ...selected, salaryCalculationDate: e.target.value })} 
+                      />
+                    </div>
+                  )}
+
+                  {(selected.salaryType === "fixed" || selected.salaryType === "fixed_commission" || selected.salaryType === "fixed_km" || !selected.salaryType) && (
                     <div className={selected.salaryType === "fixed_commission" ? "input-group" : "input-group full-width"}>
                       <label>Base Salary (₹ per month)</label>
                       <input type="number" value={selected.salary || ""} onChange={(e) => setSelected({ ...selected, salary: e.target.value })} />
@@ -303,6 +327,19 @@ function DriverList() {
                         value={selected.commissionRate || ""} 
                         onChange={(e) => setSelected({ ...selected, commissionRate: e.target.value })} 
                         style={{ borderColor: "#10b981" }}
+                      />
+                    </div>
+                  )}
+
+                  {selected.salaryType === "fixed_km" && (
+                    <div className="input-group full-width">
+                      <label>Per KM Rate (₹)</label>
+                      <input 
+                        type="number" 
+                        placeholder="e.g. 2.5" 
+                        value={selected.kmRate || ""} 
+                        onChange={(e) => setSelected({ ...selected, kmRate: e.target.value })} 
+                        style={{ borderColor: "#3b82f6" }}
                       />
                     </div>
                   )}

@@ -14,12 +14,43 @@ export const getDriverMonthSummary = (
   month,
   bookings = [],
   transactions = [],
-  submissions = []
+  submissions = [],
+  odoLogs = []
 ) => {
   const driverName = driver.name || "";
   const salaryType = driver.salaryType || "fixed";
   const commissionRate = salaryType === "fixed" ? 0 : toMoneyNumber(driver.commissionRate);
   const fixedSalary = salaryType === "commission" ? 0 : toMoneyNumber(driver.salary);
+  const kmRate = toMoneyNumber(driver.kmRate);
+
+  let distanceEarnings = 0;
+  let totalKmDriven = 0;
+
+  if (salaryType === "fixed_km") {
+    const calcDate = driver.salaryCalculationDate ? new Date(driver.salaryCalculationDate) : new Date(0);
+    const validLogs = odoLogs.filter(log => {
+      const logDate = new Date(log.timestamp || log.createdAt || log.date || 0);
+      return log.driverName === driverName && 
+             getRecordMonthKey(log) === month && 
+             logDate >= calcDate &&
+             log.odometer != null;
+    });
+    
+    if (validLogs.length >= 2) {
+      const readings = validLogs.map(l => Number(l.odometer)).filter(v => !isNaN(v));
+      if (readings.length >= 2) {
+        const minOdo = Math.min(...readings);
+        const maxOdo = Math.max(...readings);
+        totalKmDriven = maxOdo - minOdo;
+        if (totalKmDriven > 0) {
+          distanceEarnings = totalKmDriven * kmRate;
+        } else {
+          totalKmDriven = 0;
+        }
+      }
+    }
+  }
+
   const driverTrips = bookings.filter(
     (booking) =>
       getRecordMonthKey(booking) === month &&
@@ -30,7 +61,7 @@ export const getDriverMonthSummary = (
     0
   );
   const commissionEarned = bookingAmount * (commissionRate / 100);
-  const grossPayable = fixedSalary + commissionEarned;
+  const grossPayable = fixedSalary + commissionEarned + distanceEarnings;
   const approvedDeductions = transactions
     .filter(
       (transaction) =>
@@ -66,6 +97,9 @@ export const getDriverMonthSummary = (
     tripCount: driverTrips.length,
     bookingAmount,
     commissionEarned,
+    distanceEarnings,
+    totalKmDriven,
+    kmRate,
     grossPayable,
     approvedDeductions,
     pendingDeductions,
@@ -81,7 +115,8 @@ export const getDriverCarryForwardToMonth = (
   throughMonth,
   bookings = [],
   transactions = [],
-  submissions = []
+  submissions = [],
+  odoLogs = []
 ) => {
   const months = new Set();
   bookings.forEach((booking) => months.add(getRecordMonthKey(booking)));
@@ -92,7 +127,7 @@ export const getDriverCarryForwardToMonth = (
     .filter((month) => month && month <= throughMonth)
     .sort()
     .reduce((sum, month) => {
-      const summary = getDriverMonthSummary(driver, month, bookings, transactions, submissions);
+      const summary = getDriverMonthSummary(driver, month, bookings, transactions, submissions, odoLogs);
       return sum + summary.remainingThisMonth;
     }, 0);
 };

@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
 import Navbar from "../components/Navbar";
 import TruckLoader from "../components/TruckLoader";
+import Modal from "../components/Modal";
 import { db } from "../firebase";
-import { collection, getDocs } from "firebase/firestore";
-import { Landmark, Coins, TrendingUp, TrendingDown, IndianRupee, Wallet, BarChart3, Building2 } from "lucide-react";
+import { collection, getDocs, addDoc } from "firebase/firestore";
+import { Landmark, Coins, TrendingUp, TrendingDown, IndianRupee, Wallet, BarChart3, Building2, PlusCircle, MinusCircle } from "lucide-react";
 import { buildPartyBalanceMap, getAccountFinancialSummary } from "../utils/finance";
 import "./AddDriver.css"; // Safely reusing your premium UI styles
 
@@ -18,10 +19,12 @@ function Accounts() {
     totalOut: 0,
     outstandingMarket: 0,
   });
+  const [adjustModal, setAdjustModal] = useState({ show: false, account: null });
+  const [adjustForm, setAdjustForm] = useState({ type: "IN", amount: "", notes: "" });
+  const [isSaving, setIsSaving] = useState(false);
 
-  useEffect(() => {
-    const fetchFinancialData = async () => {
-      try {
+  const fetchFinancialData = async () => {
+    try {
         const [accSnap, trxSnap, bookSnap, partySnap] = await Promise.all([
           getDocs(collection(db, "accounts")),
           getDocs(collection(db, "transactions")),
@@ -56,10 +59,37 @@ function Accounts() {
       } finally {
         setLoading(false);
       }
-    };
+  };
 
+  useEffect(() => {
     fetchFinancialData();
   }, []);
+
+  const handleAdjustment = async () => {
+    if (!adjustForm.amount || !adjustForm.notes) return alert("Please enter amount and notes.");
+    setIsSaving(true);
+    try {
+      await addDoc(collection(db, "transactions"), {
+        voucherNo: `ADJ-${Math.floor(10000 + Math.random() * 90000)}`,
+        date: new Date().toISOString().split("T")[0],
+        type: adjustForm.type,
+        amount: Number(adjustForm.amount),
+        paymentAccount: adjustModal.account.accountName,
+        category: "Manual Adjustment",
+        notes: adjustForm.notes,
+        createdAt: new Date().toISOString()
+      });
+      alert("Adjustment saved successfully.");
+      setAdjustModal({ show: false, account: null });
+      setAdjustForm({ type: "IN", amount: "", notes: "" });
+      fetchFinancialData();
+    } catch (e) {
+      console.error(e);
+      alert("Error saving adjustment.");
+    } finally {
+      setIsSaving(false);
+    }
+  };
 
   return (
     <div className="page-bg">
@@ -142,9 +172,12 @@ function Accounts() {
                 <div style={{ padding: "1rem" }}>
                   {financials.cashAccounts.length === 0 ? <p style={{ color: "#94a3b8", fontSize: "0.9rem" }}>No cash accounts created yet.</p> : 
                     financials.cashAccounts.map(acc => (
-                      <div key={acc.id} style={{ display: "flex", justifyContent: "space-between", padding: "0.8rem 0", borderBottom: "1px solid #f1f5f9" }}>
+                      <div key={acc.id} style={{ display: "flex", justifyContent: "space-between", padding: "0.8rem 0", borderBottom: "1px solid #f1f5f9", alignItems: "center" }}>
                         <span style={{ color: "#475569", fontWeight: "500" }}>{acc.accountName}</span>
-                        <strong style={{ color: acc.liveBalance < 0 ? "#ef4444" : "#10b981" }}>₹{acc.liveBalance.toLocaleString('en-IN')}</strong>
+                        <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                          <strong style={{ color: acc.liveBalance < 0 ? "#ef4444" : "#10b981" }}>₹{acc.liveBalance.toLocaleString('en-IN')}</strong>
+                          <button onClick={() => setAdjustModal({ show: true, account: acc })} style={{ background: "none", border: "1px solid #e2e8f0", padding: "4px 8px", borderRadius: "6px", color: "#3b82f6", cursor: "pointer", fontSize: "0.8rem", fontWeight: "bold" }}>Adjust</button>
+                        </div>
                       </div>
                     ))
                   }
@@ -159,12 +192,15 @@ function Accounts() {
                 <div style={{ padding: "1rem" }}>
                   {financials.bankAccounts.length === 0 ? <p style={{ color: "#94a3b8", fontSize: "0.9rem" }}>No bank accounts created yet.</p> : 
                     financials.bankAccounts.map(acc => (
-                      <div key={acc.id} style={{ display: "flex", justifyContent: "space-between", padding: "0.8rem 0", borderBottom: "1px solid #f1f5f9" }}>
+                      <div key={acc.id} style={{ display: "flex", justifyContent: "space-between", padding: "0.8rem 0", borderBottom: "1px solid #f1f5f9", alignItems: "center" }}>
                         <div style={{ display: "flex", flexDirection: "column" }}>
                           <span style={{ color: "#475569", fontWeight: "500" }}>{acc.accountName}</span>
                           {acc.accountNumber && <small style={{ color: "#94a3b8" }}>A/c: {acc.accountNumber}</small>}
                         </div>
-                        <strong style={{ color: acc.liveBalance < 0 ? "#ef4444" : "#10b981" }}>₹{acc.liveBalance.toLocaleString('en-IN')}</strong>
+                        <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                          <strong style={{ color: acc.liveBalance < 0 ? "#ef4444" : "#10b981" }}>₹{acc.liveBalance.toLocaleString('en-IN')}</strong>
+                          <button onClick={() => setAdjustModal({ show: true, account: acc })} style={{ background: "none", border: "1px solid #e2e8f0", padding: "4px 8px", borderRadius: "6px", color: "#3b82f6", cursor: "pointer", fontSize: "0.8rem", fontWeight: "bold" }}>Adjust</button>
+                        </div>
                       </div>
                     ))
                   }
@@ -174,6 +210,40 @@ function Accounts() {
             </div>
 
           </div>
+        )}
+
+        {adjustModal.show && (
+          <Modal onClose={() => setAdjustModal({ show: false, account: null })}>
+            <div className="pro-modal-content" style={{ maxWidth: "400px" }}>
+              <div className="modal-header">
+                <h3>Adjust Balance</h3>
+                <span className="status-badge active">{adjustModal.account.accountName}</span>
+              </div>
+              <div className="modal-form-grid" style={{ marginTop: "1rem" }}>
+                <div className="input-group full-width">
+                  <label>Adjustment Type</label>
+                  <select value={adjustForm.type} onChange={e => setAdjustForm({...adjustForm, type: e.target.value})}>
+                    <option value="IN">Cash In (Increase Balance)</option>
+                    <option value="OUT">Cash Out (Decrease Balance)</option>
+                  </select>
+                </div>
+                <div className="input-group full-width">
+                  <label>Amount (₹)</label>
+                  <input type="number" placeholder="Enter amount" value={adjustForm.amount} onChange={e => setAdjustForm({...adjustForm, amount: e.target.value})} />
+                </div>
+                <div className="input-group full-width">
+                  <label>Notes / Reason</label>
+                  <input type="text" placeholder="e.g. Opening balance correction" value={adjustForm.notes} onChange={e => setAdjustForm({...adjustForm, notes: e.target.value})} />
+                </div>
+                <div className="modal-actions full-width" style={{ marginTop: "20px" }}>
+                  <button className="btn-cancel" onClick={() => setAdjustModal({ show: false, account: null })}>Cancel</button>
+                  <button className="btn-save" onClick={handleAdjustment} disabled={isSaving}>
+                    {isSaving ? "Saving..." : "Save Adjustment"}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </Modal>
         )}
       </div>
     </div>
