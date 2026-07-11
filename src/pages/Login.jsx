@@ -6,19 +6,14 @@ import { db } from "../firebase";
 import vitLogo from "../assets/VIT.png";
 // Removed: import { VITLogo } from "./VITLogo"; 
 import {
-  buildOtpDocId,
-  buildPortalUserDocId,
   COMPANIES,
   DEFAULT_COMPANY_KEY,
   generateOtpCode,
   getCompanyByKey,
   hashValue,
-  getMainAdminCredential,
-  PORTAL_OTPS_COLLECTION,
-  PORTAL_USERS_COLLECTION,
-  sendOtpEmail,
 } from "../utils/portalAuth";
 import { logActivity } from "../utils/activityLog";
+import { api } from "../utils/api";
 import "./login.css";
 
 const ROLE_OPTIONS = [
@@ -133,99 +128,17 @@ function Login() {
         throw new Error("Enter user ID and password.");
       }
 
-      const mainAdminUser = getMainAdminCredential({
+      const response = await api.login({
         companyKey: selectedCompanyKey,
         username: safeLoginId,
-        password,
+        password: password
       });
 
-      if (mainAdminUser) {
-        redirectAfterLogin(
-          {
-            loginId: mainAdminUser.username,
-            email: mainAdminUser.email,
-            name: mainAdminUser.name,
-            role: "main_admin",
-            roleLabel: "Main Admin",
-            companyKey: selectedCompany.key,
-            companyName: selectedCompany.name,
-          },
-          "/"
-        );
-        return;
-      }
-
-      const portalUsersSnap = await getDocs(collection(db, PORTAL_USERS_COLLECTION));
-      const portalUsers = portalUsersSnap.docs.map((item) => ({
-        id: item.id,
-        ...item.data(),
-      }));
-      const portalUser = portalUsers.find(
-        (item) =>
-          item.companyKey === selectedCompanyKey &&
-          String(item.username || "").trim().toLowerCase() === safeLoginId.toLowerCase()
+      redirectAfterLogin(
+        response.user, 
+        response.user.role === "driver" ? "/driver-dashboard" : "/"
       );
 
-      if (portalUser) {
-        if (!portalUser.passwordHash)
-          throw new Error("Account configuration error. Please contact the main admin.");
-
-        const passwordHash = await hashValue(password);
-        if (passwordHash !== portalUser.passwordHash)
-          throw new Error("Invalid user ID or password.");
-        if (portalUser.status !== "approved") {
-          throw new Error(
-            portalUser.status === "pending"
-              ? "Your registration is waiting for main admin approval."
-              : "This user is not approved to login."
-          );
-        }
-
-        redirectAfterLogin(
-          {
-            loginId: portalUser.username,
-            email: portalUser.email,
-            name: portalUser.name,
-            role: portalUser.role || portalUser.requestedRole || "admin",
-            roleLabel:
-              ROLE_LABELS[portalUser.role || portalUser.requestedRole] || "Secondary Admin",
-            companyKey: portalUser.companyKey,
-            companyName: portalUser.companyName,
-          },
-          "/"
-        );
-        return;
-      }
-
-      const driversSnap = await getDocs(collection(db, "drivers"));
-      const drivers = driversSnap.docs.map((item) => ({ id: item.id, ...item.data() }));
-      const driver = drivers.find(
-        (item) =>
-          String(item.driverLoginId || item.phone || "").trim() === safeLoginId &&
-          item.password === password
-      );
-
-      if (driver) {
-        if (driver.status === "inactive")
-          throw new Error("Your driver account is inactive. Please contact the admin.");
-
-        redirectAfterLogin(
-          {
-            loginId: driver.driverLoginId || driver.phone,
-            role: "driver",
-            roleLabel: "Driver",
-            driverId: driver.id,
-            name: driver.name,
-            email: driver.email || "",
-            companyKey: selectedCompany.key,
-            companyName: selectedCompany.name,
-          },
-          "/driver-dashboard"
-        );
-        return;
-      }
-
-      throw new Error("Invalid user ID or password.");
     } catch (loginError) {
       setError(loginError.message);
     } finally {
@@ -250,21 +163,11 @@ function Login() {
         throw new Error("Password and confirm password do not match.");
       }
 
-      const existingUsers = await getDocs(collection(db, PORTAL_USERS_COLLECTION));
-      const allUsers = existingUsers.docs.map((item) => item.data());
-      const usernameTaken = allUsers.some(
-        (item) =>
-          item.companyKey === selectedCompanyKey &&
-          String(item.username || "").trim().toLowerCase() === safeUsername
-      );
-
-      if (usernameTaken) throw new Error("This user ID is already in use.");
-
       const otpCode = generateOtpCode();
       const otpHash = await hashValue(otpCode);
       const expiry = Date.now() + 10 * 60 * 1000;
 
-      await sendOtpEmail({
+      await api.sendOtpEmail({
         toEmail: safeEmail,
         passcode: otpCode,
         companyName: selectedCompany.name,
@@ -297,40 +200,15 @@ function Login() {
       const enteredOtpHash = await hashValue(registerForm.otp.trim());
       if (enteredOtpHash !== registerOtpHash) throw new Error("Invalid OTP.");
 
-      const passwordHash = await hashValue(registerForm.password);
-
-      await setDoc(
-        doc(
-          db,
-          PORTAL_USERS_COLLECTION,
-          buildPortalUserDocId(selectedCompanyKey, safeEmail)
-        ),
-        {
-          name: registerForm.name.trim(),
-          username: safeUsername,
-          email: safeEmail,
-          passwordHash,
-          companyKey: selectedCompany.key,
-          companyName: selectedCompany.name,
-          requestedRole: registerForm.requestedRole,
-          role: registerForm.requestedRole,
-          status: "pending",
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-        }
-      );
-
-      await setDoc(
-        doc(db, PORTAL_OTPS_COLLECTION, buildOtpDocId(selectedCompanyKey, safeEmail)),
-        {
-          email: safeEmail,
-          username: safeUsername,
-          companyKey: selectedCompany.key,
-          verifiedAt: new Date().toISOString(),
-          registrationOtpUsed: true,
-        },
-        { merge: true }
-      );
+      await api.registerRequest({
+        name: registerForm.name.trim(),
+        username: safeUsername,
+        email: safeEmail,
+        password: registerForm.password,
+        companyKey: selectedCompany.key,
+        companyName: selectedCompany.name,
+        requestedRole: registerForm.requestedRole
+      });
 
       setSuccess("Registration submitted. Wait for main admin approval before login.");
       setRegisterForm(emptyRegisterForm);

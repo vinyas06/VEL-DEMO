@@ -6,6 +6,7 @@ import { Truck, MapPin, Navigation, PlusCircle, CheckCircle, LogOut, User, Clock
 import AttachmentUploader from "../components/AttachmentUploader";
 import { uploadAttachments } from "../utils/attachments";
 import { logActivity } from "../utils/activityLog";
+import { api } from "../utils/api";
 import "./DriverDashboard.css"; 
 
 const formatMoney = (value) =>
@@ -113,36 +114,17 @@ function DriverDashboard() {
 
     const fetchInitialData = async () => {
       try {
-        // 1. Fetch Driver Profile for Pay Details
-        const driverQuery = query(collection(db, "drivers"), where("name", "==", loggedInDriverName));
-        const driverSnap = await getDocs(driverQuery);
-        if (!driverSnap.empty) {
-          setDriverProfile(driverSnap.docs[0].data());
+        const data = await api.getDriverDashboard();
+        
+        if (data.profile) {
+          setDriverProfile(data.profile);
         }
-
-        // 2. Fetch Trips and Driver Advance Account
-        const [trips, transactionSnap, submissionSnap] = await Promise.all([
-          loadTripsForDriver(loggedInDriverName),
-          getDocs(collection(db, "transactions")),
-          getDocs(collection(db, "driver_submissions")),
-        ]);
-        setAllTrips(trips);
-        const transactionData = transactionSnap.docs.map((docItem) => ({ id: docItem.id, ...docItem.data() }));
-        setDriverTransactions(
-          transactionData.filter((transaction) => getDriverTransactionName(transaction) === loggedInDriverName)
-        );
-        setDriverSubmissions(
-          submissionSnap.docs
-            .map((docItem) => ({ id: docItem.id, ...docItem.data() }))
-            .filter((submission) => getDriverTransactionName(submission) === loggedInDriverName)
-        );
-        setDriverWallet(
-          buildDriverWallet(
-            loggedInDriverName,
-            transactionData,
-            submissionSnap.docs.map((docItem) => ({ id: docItem.id, ...docItem.data() }))
-          )
-        );
+        setAllTrips(data.bookings || []);
+        setDriverTransactions(data.transactions || []);
+        setDriverSubmissions(data.submissions || []);
+        if (data.wallet) {
+          setDriverWallet(data.wallet);
+        }
       } catch (error) {
         console.error("Error fetching driver data:", error);
       } finally {
@@ -155,7 +137,8 @@ function DriverDashboard() {
 
   const fetchMyTrips = async () => {
     try {
-      setAllTrips(await loadTripsForDriver(loggedInDriverName));
+      const data = await api.getDriverDashboard();
+      setAllTrips(data.bookings || []);
     } catch (error) {
       console.error(error);
     }

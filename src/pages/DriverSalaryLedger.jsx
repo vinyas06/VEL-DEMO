@@ -8,6 +8,7 @@ import {
   getDriverMonthSummary,
   getDriverRecordName,
   getRecordMonthKey,
+  getActiveSalaryScheme,
 } from "../utils/driverSalary";
 import { getCurrentMonthValue } from "../utils/dateRange";
 import "./BookingList.css";
@@ -116,12 +117,15 @@ function DriverSalaryLedger() {
   // Calculate dynamic running balance for the selected driver
   if (selectedDriver !== "All") {
     const driverObj = drivers.find(d => d.name === selectedDriver) || {};
-    const commissionRate = driverObj.salaryType === "fixed" ? 0 : Number(driverObj.commissionRate || 0);
     const prevCarryForward = (rows.find(r => r.driverName === selectedDriver)?.previousCarryForward) || 0;
     
     let currentBalance = prevCarryForward;
     driverTransactionRows = driverTransactionRows.map(row => {
       if (row.isBooking) {
+        const month = getRecordMonthKey(row);
+        const activeScheme = getActiveSalaryScheme(driverObj, month);
+        const commissionRate = activeScheme.salaryType === "fixed" ? 0 : Number(activeScheme.commissionRate || 0);
+        
         const earned = Number(row.freight || 0) * (commissionRate / 100);
         currentBalance += earned;
         return { ...row, dynamicBalance: currentBalance, calculatedEarned: earned };

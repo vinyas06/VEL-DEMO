@@ -9,6 +9,22 @@ export const getDriverRecordName = (record = {}) =>
 export const getRecordMonthKey = (record = {}) =>
   String(record.loadingDate || record.date || record.createdAt || "").slice(0, 7);
 
+export const getActiveSalaryScheme = (driver, month) => {
+  if (driver.salaryHistory && driver.salaryHistory.length > 0) {
+    const validSchemes = driver.salaryHistory.filter(h => h.effectiveMonth <= month);
+    if (validSchemes.length > 0) {
+      return validSchemes.reduce((max, current) => 
+        current.effectiveMonth > max.effectiveMonth ? current : max
+      );
+    } else {
+      return driver.salaryHistory.reduce((min, current) => 
+        current.effectiveMonth < min.effectiveMonth ? current : min
+      );
+    }
+  }
+  return driver; // Fallback
+};
+
 export const getDriverMonthSummary = (
   driver = {},
   month,
@@ -17,11 +33,12 @@ export const getDriverMonthSummary = (
   submissions = [],
   odoLogs = []
 ) => {
+  const activeScheme = getActiveSalaryScheme(driver, month);
   const driverName = driver.name || "";
-  const salaryType = driver.salaryType || "fixed";
-  const commissionRate = salaryType === "fixed" ? 0 : toMoneyNumber(driver.commissionRate);
-  const fixedSalary = salaryType === "commission" ? 0 : toMoneyNumber(driver.salary);
-  const kmRate = toMoneyNumber(driver.kmRate);
+  const salaryType = activeScheme.salaryType || "fixed";
+  const commissionRate = salaryType === "fixed" ? 0 : toMoneyNumber(activeScheme.commissionRate);
+  const fixedSalary = salaryType === "commission" ? 0 : toMoneyNumber(activeScheme.salary);
+  const kmRate = toMoneyNumber(activeScheme.kmRate);
 
   let distanceEarnings = 0;
   let totalKmDriven = 0;

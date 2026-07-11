@@ -5,6 +5,7 @@ import { db } from "../firebase";
 import { collection, doc, updateDoc, onSnapshot } from "firebase/firestore";
 import { Search, User, Phone, FileText, Edit, Eye, ShieldAlert } from "lucide-react";
 import { logActivity } from "../utils/activityLog";
+import { getActiveSalaryScheme, getRecordMonthKey } from "../utils/driverSalary";
 import "./DriverList.css"; 
 
 const getSalaryTypeLabel = (driver = {}) => {
@@ -94,6 +95,35 @@ function DriverList() {
       updatePayload.kmRate =
         updatePayload.kmRate === "" ? "" : Number(updatePayload.kmRate) || 0;
 
+      const currentDriver = drivers.find(d => d.id === selected.id) || selected;
+      const currentMonth = new Date().toISOString().slice(0, 7);
+      
+      let newHistory = currentDriver.salaryHistory ? [...currentDriver.salaryHistory] : [{
+          effectiveMonth: "2000-01",
+          salaryType: currentDriver.salaryType || "fixed",
+          salary: currentDriver.salary || 0,
+          commissionRate: currentDriver.commissionRate || 0,
+          kmRate: currentDriver.kmRate || 0
+      }];
+      
+      const newEntry = {
+          effectiveMonth: currentMonth,
+          salaryType: updatePayload.salaryType || "fixed",
+          salary: updatePayload.salary || 0,
+          commissionRate: updatePayload.commissionRate || 0,
+          kmRate: updatePayload.kmRate || 0
+      };
+
+      const existingEntryIndex = newHistory.findIndex(h => h.effectiveMonth === currentMonth);
+      if (existingEntryIndex >= 0) {
+          newHistory[existingEntryIndex] = newEntry;
+      } else {
+          newHistory.push(newEntry);
+      }
+      
+      newHistory.sort((a, b) => a.effectiveMonth.localeCompare(b.effectiveMonth));
+      updatePayload.salaryHistory = newHistory;
+
       await updateDoc(doc(db, "drivers", selected.id), updatePayload);
       await logActivity(db, {
         action: "driver_updated",
@@ -130,13 +160,23 @@ function DriverList() {
     const driverTrips = bookings.filter(
       (booking) => booking.driver === selected.name || booking.driver2 === selected.name
     );
+    
+    let bookingAmount = 0;
+    let commissionEarned = 0;
+    
+    driverTrips.forEach((booking) => {
+        const month = getRecordMonthKey(booking);
+        const activeScheme = getActiveSalaryScheme(selected, month);
+        const rate = activeScheme.salaryType === "fixed" ? 0 : toNumber(activeScheme.commissionRate);
+        const freight = toNumber(booking.freight);
+        
+        bookingAmount += freight;
+        commissionEarned += freight * (rate / 100);
+    });
+
     const commissionRate =
       selected.salaryType === "fixed" ? 0 : toNumber(selected.commissionRate);
-    const bookingAmount = driverTrips.reduce(
-      (sum, booking) => sum + toNumber(booking.freight),
-      0
-    );
-    const commissionEarned = bookingAmount * (commissionRate / 100);
+
     const approvedDeductions = transactions
       .filter(
         (transaction) =>
