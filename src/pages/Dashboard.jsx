@@ -9,6 +9,7 @@ import { getCurrentMonthRange, isRecordInDateRange } from "../utils/dateRange";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
 import { MapPin, Fuel, Wifi, AlertTriangle, Loader2, Database } from "lucide-react";
 import "./Dashboard.css"; 
+import { getAccountFinancialSummary } from "../utils/finance";
 
 import cashIcon from "../assets/cshin hand.jpeg";
 import revenueIcon from "../assets/rev.jpeg";
@@ -76,9 +77,10 @@ function Dashboard() {
 
     const fetchFirebaseData = async () => {
       try {
-        const [trxSnap, bookingsSnap] = await Promise.all([
+        const [trxSnap, bookingsSnap, accSnap] = await Promise.all([
           getDocs(collection(db, "transactions")),
-          getDocs(collection(db, "bookings"))
+          getDocs(collection(db, "bookings")),
+          getDocs(collection(db, "accounts"))
         ]);
 
         const { fromDate, toDate } = getCurrentMonthRange();
@@ -92,7 +94,13 @@ function Dashboard() {
           dailyData.push({ day: `${i} ${currentMonthShort}`, Income: 0, Expense: 0 });
         }
 
-        const transactions = trxSnap.docs.map(d => d.data());
+        const transactions = trxSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+        const accounts = accSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+        
+        // Calculate true Net Cash in Hand across all cash accounts of all time
+        const accountSummary = getAccountFinancialSummary(accounts, transactions);
+        const actualCashInHand = accountSummary.totalCash;
+
         const monthTransactions = transactions.filter((t) => isRecordInDateRange(t, ["date", "createdAt"], fromDate, toDate));
         
         let totalIn = 0;
@@ -136,7 +144,7 @@ function Dashboard() {
         const newStats = {
           totalProfit: totalRevenue,
           totalExpense: totalOut,
-          cashInHand: totalIn - totalOut,
+          cashInHand: actualCashInHand,
           activeTrips: activeTripsCount,
           graphData: dailyData // Saving the chart data
         };
