@@ -1,9 +1,9 @@
 import React, { useEffect, useState, useRef } from "react";
-import { collection, onSnapshot, getDocs, query, where } from "firebase/firestore";
-import { db } from "../firebase";
 import Navbar from "../components/Navbar";
 import { Loader2, MapPin, Clock, Search, RefreshCw, Navigation, History, X } from "lucide-react";
 import "./TrackingDashboard.css";
+import { io } from "socket.io-client";
+import { API_BASE_URL } from "../utils/api";
 
 function TrackingDashboard() {
   const [drivers, setDrivers] = useState([]);
@@ -32,33 +32,12 @@ function TrackingDashboard() {
     const fetchHistory = async () => {
       setFetchingHistory(true);
       try {
-        const startOfDay = new Date(historyDate);
-        startOfDay.setHours(0, 0, 0, 0);
-        const endOfDay = new Date(historyDate);
-        endOfDay.setHours(23, 59, 59, 999);
-
-        const q = query(
-          collection(db, "driver_location_history"), 
-          where("driverName", "==", historyDriverId)
-        );
+        const response = await fetch(`${API_BASE_URL}/api/driver/location-history/${encodeURIComponent(historyDriverId)}`);
+        if (!response.ok) throw new Error("Failed to load history");
+        const pathData = await response.json();
         
-        const snapshot = await getDocs(q);
-        
-        const pathData = snapshot.docs
-          .map(doc => doc.data())
-          .filter(d => d.timestamp)
-          .filter(d => {
-            const date = d.timestamp.toDate ? d.timestamp.toDate() : new Date(d.timestamp);
-            return date >= startOfDay && date <= endOfDay;
-          })
-          .sort((a, b) => {
-            const d1 = a.timestamp.toDate ? a.timestamp.toDate() : new Date(a.timestamp);
-            const d2 = b.timestamp.toDate ? b.timestamp.toDate() : new Date(b.timestamp);
-            return d1 - d2;
-          })
-          .map(d => ({ lat: d.latitude, lng: d.longitude }));
-
-        setHistoryPath(pathData);
+        const mappedPath = pathData.map(d => ({ lat: Number(d.lat), lng: Number(d.lng) }));
+        setHistoryPath(mappedPath);
       } catch(e) {
         console.error("Error fetching history:", e);
       } finally {
@@ -95,17 +74,63 @@ function TrackingDashboard() {
 
   useEffect(() => {
     setLoading(true);
-    // Listen to driver_locations in real-time
-    const unsubscribe = onSnapshot(collection(db, "driver_locations"), (snapshot) => {
-      const data = snapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-      }));
-      setDrivers(data);
-      setLoading(false);
+
+    // 1. Initial Load of current driver locations via REST API
+    const loadInitialLocations = async () => {
+      try {
+        const response = await fetch(`${API_BASE_URL}/api/driver/locations`);
+        if (response.ok) {
+          const data = await response.json();
+          setDrivers(data);
+        }
+      } catch (err) {
+        console.error("Failed to load initial active driver locations:", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    loadInitialLocations();
+
+    // 2. Establish connection to Socket.io backend for real-time updates
+    const socket = io(API_BASE_URL, {
+      withCredentials: true,
+      transports: ["websocket", "polling"]
     });
 
-    return () => unsubscribe();
+    socket.on("connect", () => {
+      console.log("Connected to location tracking WebSocket backend:", socket.id);
+    });
+
+    socket.on("location_update", (update) => {
+      setDrivers(prevDrivers => {
+        const existingIdx = prevDrivers.findIndex(d => d.id === update.driverName || d.driverName === update.driverName);
+        if (existingIdx !== -1) {
+          const updated = [...prevDrivers];
+          updated[existingIdx] = {
+            ...updated[existingIdx],
+            latitude: update.latitude,
+            longitude: update.longitude,
+            updatedAt: update.updatedAt
+          };
+          return updated;
+        } else {
+          return [
+            ...prevDrivers,
+            {
+              id: update.driverName,
+              driverName: update.driverName,
+              latitude: update.latitude,
+              longitude: update.longitude,
+              updatedAt: update.updatedAt
+            }
+          ];
+        }
+      });
+    });
+
+    return () => {
+      socket.disconnect();
+    };
   }, [refreshTrigger]);
 
   const formatTimeAgo = (timestamp) => {
