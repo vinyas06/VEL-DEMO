@@ -1,5 +1,5 @@
 // This utility handles all secure communications with the Express Backend
-export const API_BASE_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:5000";
+export const API_BASE_URL = import.meta.env.VITE_BACKEND_URL || "https://vel-backend-5l0o.onrender.com";
 
 /**
  * Make an authenticated fetch request to the backend API.
